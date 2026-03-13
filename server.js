@@ -83,12 +83,13 @@ app.post('/api/chunk', async (req, res) => {
             return res.status(500).json({ error: 'OPENAI_API_KEY not set' });
         }
 
-        const apiResponse = await fetch('https://api.openai.com/v1/responses', {
+const apiResponse = await fetch('https://api.openai.com/v1/responses', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + OPENAI_API_KEY
             },
+            signal: AbortSignal.timeout(120000),
             body: JSON.stringify({
                 model: 'gpt-5.4',
                 prompt: {
