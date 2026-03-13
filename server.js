@@ -89,7 +89,7 @@ const apiResponse = await fetch('https://api.openai.com/v1/responses', {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + OPENAI_API_KEY
             },
-            signal: AbortSignal.timeout(180000),
+            signal: AbortSignal.timeout(240000),
             body: JSON.stringify({
                 model: 'gpt-5.4',
                 prompt: {
