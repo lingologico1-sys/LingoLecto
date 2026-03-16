@@ -147,6 +147,7 @@
             <select class="lang-selector" id="langSelect"></select>
             <button class="header-btn" id="btn-back">← New Text</button>
         </div>
+        <button class="header-btn" id="btn-reset-all" title="Reset everything to defaults" style="background:rgba(198,40,40,0.25);border-color:rgba(239,154,154,0.4);">Reset All</button>
     </header>
 
     <!-- ===== SETUP VIEW ===== -->
@@ -305,7 +306,6 @@
 
     function initEditorIframe() {
         const iframe = $('tiptapEditorFrame');
-        // We'll load the editor HTML as a blob URL
         const editorHTML = buildEditorHTML();
         const blob = new Blob([editorHTML], { type: 'text/html' });
         iframe.src = URL.createObjectURL(blob);
@@ -316,9 +316,101 @@
             if (data.type === 'content-changed') {
                 editorJson = data.detail.json;
                 editorHtml = data.detail.html;
+                saveFormState();
+            }
+            if (data.type === 'ready') {
+                restoreEditorContent();
             }
         });
     }
+
+    // ================================================================
+    // FORM PERSISTENCE (localStorage)
+    // ================================================================
+    const FORM_STORAGE_KEY = 'lingoreader-form';
+
+    function saveFormState() {
+        try {
+            const s = {
+                activeTab: activeTab,
+                plainTextInput: $('plainTextInput').value,
+                tiptapInput: $('tiptapInput').value,
+                jsonInput: $('jsonInput').value,
+                jsonTiptapInput: $('jsonTiptapInput').value,
+                voiceId: $('voiceId').value,
+                stability: $('stability').value,
+                similarity_boost: $('similarity_boost').value,
+                style: $('style').value,
+                use_speaker_boost: $('use_speaker_boost').checked,
+                editorJson: editorJson,
+                editorHtml: editorHtml
+            };
+            localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(s));
+        } catch (e) {}
+    }
+
+    function loadFormState() {
+        try {
+            const raw = localStorage.getItem(FORM_STORAGE_KEY);
+            if (!raw) return;
+            const s = JSON.parse(raw);
+
+            if (s.activeTab) {
+                activeTab = s.activeTab;
+                document.querySelectorAll('.input-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                $('panel-' + activeTab).classList.add('active');
+            }
+            if (s.plainTextInput) $('plainTextInput').value = s.plainTextInput;
+            if (s.tiptapInput) $('tiptapInput').value = s.tiptapInput;
+            if (s.jsonInput) $('jsonInput').value = s.jsonInput;
+            if (s.jsonTiptapInput) $('jsonTiptapInput').value = s.jsonTiptapInput;
+            if (s.voiceId) $('voiceId').value = s.voiceId;
+            if (s.stability != null) { $('stability').value = s.stability; $('val-stability').textContent = parseFloat(s.stability).toFixed(2); }
+            if (s.similarity_boost != null) { $('similarity_boost').value = s.similarity_boost; $('val-similarity').textContent = parseFloat(s.similarity_boost).toFixed(2); }
+            if (s.style != null) { $('style').value = s.style; $('val-style').textContent = parseFloat(s.style).toFixed(2); }
+            if (s.use_speaker_boost != null) $('use_speaker_boost').checked = s.use_speaker_boost;
+            if (s.editorJson) editorJson = s.editorJson;
+            if (s.editorHtml) editorHtml = s.editorHtml;
+        } catch (e) {}
+    }
+
+    function restoreEditorContent() {
+        if (!editorJson) return;
+        const iframe = $('tiptapEditorFrame');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'set-content', json: editorJson }, '*');
+        }
+    }
+
+    function resetAll() {
+        if (!confirm('Reset everything to defaults? All saved text and settings will be erased.')) return;
+        localStorage.removeItem(FORM_STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
+        $('plainTextInput').value = '';
+        $('tiptapInput').value = '';
+        $('jsonInput').value = '';
+        $('jsonTiptapInput').value = '';
+        $('voiceId').value = 'JBFqnCBsd6RMkjVDRZzb';
+        $('stability').value = '0.5'; $('val-stability').textContent = '0.50';
+        $('similarity_boost').value = '0.75'; $('val-similarity').textContent = '0.75';
+        $('style').value = '0.0'; $('val-style').textContent = '0.00';
+        $('use_speaker_boost').checked = true;
+        editorJson = null; editorHtml = '';
+        const iframe = $('tiptapEditorFrame');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'set-content', json: { type: 'doc', content: [{ type: 'paragraph' }] } }, '*');
+        }
+        activeTab = 'plain';
+        document.querySelectorAll('.input-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'plain'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        $('panel-plain').classList.add('active');
+        $('btn-restore').style.display = 'none';
+    }
+
+    // Debounced save for text inputs
+    let _saveTimer = null;
+    function debouncedSave() { clearTimeout(_saveTimer); _saveTimer = setTimeout(saveFormState, 500); }
 
     // ================================================================
     // TABS
@@ -332,6 +424,7 @@
             tab.classList.add('active');
             activeTab = tab.dataset.tab;
             $('panel-' + activeTab).classList.add('active');
+            saveFormState();
         });
     });
 
@@ -342,9 +435,19 @@
     const similarityEl = $('similarity_boost');
     const styleEl = $('style');
 
-    stabilityEl.addEventListener('input', () => $('val-stability').textContent = parseFloat(stabilityEl.value).toFixed(2));
-    similarityEl.addEventListener('input', () => $('val-similarity').textContent = parseFloat(similarityEl.value).toFixed(2));
-    styleEl.addEventListener('input', () => $('val-style').textContent = parseFloat(styleEl.value).toFixed(2));
+    stabilityEl.addEventListener('input', () => { $('val-stability').textContent = parseFloat(stabilityEl.value).toFixed(2); debouncedSave(); });
+    similarityEl.addEventListener('input', () => { $('val-similarity').textContent = parseFloat(similarityEl.value).toFixed(2); debouncedSave(); });
+    styleEl.addEventListener('input', () => { $('val-style').textContent = parseFloat(styleEl.value).toFixed(2); debouncedSave(); });
+
+    // Save on text input changes
+    ['plainTextInput','tiptapInput','jsonInput','jsonTiptapInput','voiceId'].forEach(id => {
+        $(id).addEventListener('input', debouncedSave);
+    });
+    $('use_speaker_boost').addEventListener('change', saveFormState);
+    $('btn-reset-all').addEventListener('click', resetAll);
+
+    // Restore saved form state on load
+    loadFormState();
 
     if (localStorage.getItem(STORAGE_KEY)) $('btn-restore').style.display = '';
 
@@ -771,6 +874,7 @@ else if(cmd==='tblDelete')delTable()}}
 try{
 buildFontMenu();buildColors();buildEmoji();
 editor=new Editor({element:document.getElementById('editor'),extensions:[StarterKit,Underline,TextStyle,Color,Highlight.configure({multicolor:true}),FontFamily,FontSize,TextAlign.configure({types:['heading','paragraph']}),Link.configure({openOnClick:false}),ResizableImage.configure({inline:true,allowBase64:true}),Table.configure({resizable:true}),TableRow,TableHeader,TableCell,CharacterCount],onUpdate:()=>{const j=editor.getJSON();send('content-changed',{json:j,jsonString:JSON.stringify(j),html:editor.getHTML()});updateToolbar()},onSelectionUpdate:updateToolbar,onCreate:()=>{editor.chain().focus().setFontFamily('Comic Sans MS').run();updateToolbar();send('ready',{ok:true})}});
+window.addEventListener('message',function(ev){try{var d=ev.data||{};if(d.type==='set-content'&&d.json&&editor){editor.commands.setContent(d.json,false)}}catch(e){console.error('set-content failed',e)}});
 wire();
 
 /* ── Image Resize System ── */
