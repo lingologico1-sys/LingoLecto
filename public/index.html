@@ -317,35 +317,7 @@
                 editorJson = data.detail.json;
                 editorHtml = data.detail.html;
             }
-            if (data.type === 'upload-image-request') {
-                handleEditorImageUpload(data.detail, iframe.contentWindow);
-            }
         });
-    }
-
-    async function handleEditorImageUpload(detail, iframeWindow) {
-        try {
-            // Get pre-signed URL from our server
-            const res = await fetch('/api/upload-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileName: detail.name, fileType: detail.type })
-            });
-            const data = await res.json();
-
-            // Send upload parameters back to the iframe editor
-            iframeWindow.postMessage({
-                type: 'attr',
-                name: 'upload-response',
-                value: JSON.stringify({ id: detail.id, result: data })
-            }, '*');
-        } catch (err) {
-            iframeWindow.postMessage({
-                type: 'attr',
-                name: 'upload-response',
-                value: JSON.stringify({ id: detail.id, result: { ok: false, error: err.message } })
-            }, '*');
-        }
     }
 
     // ================================================================
@@ -702,27 +674,20 @@ async function uploadFile(file,pos){
 if(file.size>10485760){alert('Image too large (max 10MB)');return}
 const id='req_'+Math.random().toString(36).substr(2,9);
 let preview;try{preview=await readDataURL(file)}catch(e){preview=''}
-pendingUploads[id]={file,preview};
+pendingUploads[id]=true;
 if(preview){const attrs={src:preview,'data-upload-id':id};try{const{state:s}=editor;const n=s.schema.nodes.image.create(attrs);editor.view.dispatch(s.tr.insert(pos,n))}catch(e){editor.chain().focus().setImage(attrs).run()}
 createOverlay(id)}
-send('upload-image-request',{id,name:file.name,type:file.type||'application/octet-stream',size:file.size})}
+try{
+const res=await fetch('/api/upload-image',{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':file.name},body:file});
+const data=await res.json();
+delete pendingUploads[id];removeOverlay(id);
+if(data.ok)replacePlaceholder(id,data.publicUrl);else{removePlaceholder(id);alert('Upload failed: '+(data.error||'Unknown'));}
+if(Object.keys(pendingUploads).length===0&&editor)setTimeout(()=>{const j=editor.getJSON();send('content-changed',{json:j,jsonString:JSON.stringify(j),html:editor.getHTML()})},100);
+}catch(err){delete pendingUploads[id];removeOverlay(id);removePlaceholder(id);alert('Upload failed: network error')}}
 
 function createOverlay(id){const c=document.getElementById('editor');const o=document.createElement('div');o.className='img-upload-overlay';o.id='ov-'+id;o.innerHTML='<div class="img-upload-bar-track"><div class="img-upload-bar-fill indeterminate" id="bar-'+id+'"></div></div><div class="img-upload-label" id="lbl-'+id+'">Uploading…</div>';c.appendChild(o);posOverlay(id)}
 function posOverlay(id){const o=document.getElementById('ov-'+id);if(!o)return;const img=document.querySelector('.ProseMirror img[data-upload-id="'+id+'"]');if(!img){if(!o._r)o._r=0;o._r++;if(o._r<30)requestAnimationFrame(()=>posOverlay(id));return}const c=document.getElementById('editor');const cr=c.getBoundingClientRect();const ir=img.getBoundingClientRect();const st=c.scrollTop;o.style.top=(ir.top-cr.top+st)+'px';o.style.left=(ir.left-cr.left)+'px';o.style.width=ir.width+'px';o.style.height=ir.height+'px';if(document.getElementById('ov-'+id))requestAnimationFrame(()=>posOverlay(id))}
 function removeOverlay(id){const o=document.getElementById('ov-'+id);if(o)o.remove()}
-
-window.addEventListener('message',e=>{const d=e.data||{};if(d.type==='attr'&&d.name==='upload-response'){try{const p=JSON.parse(d.value||'{}');if(p.id&&p.result)processUpload(p.id,p.result)}catch(err){}}});
-
-async function processUpload(id,result){
-const p=pendingUploads[id];if(!p)return;
-if(!result.ok){delete pendingUploads[id];removeOverlay(id);removePlaceholder(id);alert('Upload failed: '+(result.error||'Unknown'));return}
-try{
-const bar=document.getElementById('bar-'+id);if(bar){bar.classList.remove('indeterminate');bar.style.width='0%'}
-const ok=await new Promise(resolve=>{const xhr=new XMLHttpRequest();xhr.open('PUT',result.uploadUrl,true);xhr.setRequestHeader('Content-Type',p.file.type||'application/octet-stream');xhr.upload.onprogress=e=>{if(e.lengthComputable&&bar)bar.style.width=Math.round(e.loaded/e.total*100)+'%'};xhr.onload=()=>resolve(xhr.status>=200&&xhr.status<300);xhr.onerror=()=>resolve(false);xhr.send(p.file)});
-delete pendingUploads[id];removeOverlay(id);
-if(ok)replacePlaceholder(id,result.publicUrl);else{removePlaceholder(id);alert('Upload failed')}
-if(Object.keys(pendingUploads).length===0&&editor)setTimeout(()=>{const j=editor.getJSON();send('content-changed',{json:j,jsonString:JSON.stringify(j),html:editor.getHTML()})},100);
-}catch(err){delete pendingUploads[id];removeOverlay(id);removePlaceholder(id);alert('Network error')}}
 
 function replacePlaceholder(id,src){const{state:s}=editor;s.doc.descendants((n,p)=>{if(n.type.name==='image'&&n.attrs['data-upload-id']===id){const a={...n.attrs,src};delete a['data-upload-id'];editor.view.dispatch(s.tr.setNodeMarkup(p,undefined,a));return false}})}
 function removePlaceholder(id){const{state:s}=editor;s.doc.descendants((n,p)=>{if(n.type.name==='image'&&n.attrs['data-upload-id']===id){editor.view.dispatch(s.tr.delete(p,p+n.nodeSize));return false}})}

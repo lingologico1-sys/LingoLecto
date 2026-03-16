@@ -32,6 +32,37 @@ function makeR2Client() {
     });
 }
 
+// ── R2 Image Upload: server-side proxy (avoids browser CORS on presigned URLs) ──
+app.post('/api/upload-image', express.raw({ type: '*/*', limit: '20mb' }), async (req, res) => {
+    try {
+        const fileName = req.headers['x-filename'] || 'image.jpg';
+        const fileType = req.headers['content-type'] || 'application/octet-stream';
+
+        const s3 = makeR2Client();
+        if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
+
+        const cleanName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const key = `lingoscribo/${Date.now()}_${cleanName}`;
+
+        await s3.send(new PutObjectCommand({
+            Bucket: IMAGE_BUCKET_NAME,
+            Key: key,
+            ContentType: fileType,
+            Body: req.body
+        }));
+
+        const optimizedFormats = ['image/avif', 'image/webp', 'image/svg+xml', 'image/gif'];
+        const publicUrl = optimizedFormats.includes(fileType)
+            ? `${IMAGE_DOMAIN}/${key}`
+            : `${IMAGE_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
+
+        res.json({ ok: true, publicUrl });
+    } catch (err) {
+        console.error('Image upload error:', err);
+        res.status(500).json({ ok: false, error: err.message || 'Upload failed' });
+    }
+});
+
 // ── R2 Image Upload: get pre-signed URL ──────────────────────────────────
 app.post('/api/upload-url', async (req, res) => {
     try {
