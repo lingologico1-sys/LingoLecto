@@ -95,6 +95,14 @@
 
         /* TipTap Editor Embed */
         .tiptap-editor-frame { width: 100%; height: 500px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .json-viewer { margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+        .json-viewer-toggle { padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-secondary); user-select: none; list-style: none; display: flex; align-items: center; gap: 6px; }
+        .json-viewer-toggle::-webkit-details-marker { display: none; }
+        .json-viewer-toggle::before { content: '\25B6'; font-size: 10px; transition: transform 0.2s; }
+        .json-viewer[open] .json-viewer-toggle::before { transform: rotate(90deg); }
+        .json-viewer-body { padding: 0 14px 14px; }
+        .json-viewer-textarea { width: 100%; height: 200px; background: #1a1a2e; color: #e0ddd5; border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; resize: vertical; box-sizing: border-box; tab-size: 2; }
+        .json-viewer-apply { margin-top: 8px; font-size: 12px; padding: 6px 14px; }
 
         /* READER */
         .reader-container { max-width: 680px; margin: 0 auto; padding: 40px 32px 100px; animation: fadeUp 0.4s ease-out; }
@@ -177,6 +185,13 @@
                         <iframe id="tiptapEditorFrame" class="tiptap-editor-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-modals" title="TipTap Editor"></iframe>
                         <div class="field-hint">Write rich text with formatting, images, and tables. Text is extracted for chunking; HTML is preserved for the reader.</div>
                     </div>
+                    <details class="json-viewer" id="jsonViewer">
+                        <summary class="json-viewer-toggle">TipTap JSON / HTML</summary>
+                        <div class="json-viewer-body">
+                            <textarea id="jsonViewerText" class="json-viewer-textarea" spellcheck="false" placeholder="Paste TipTap JSON here to load into editor..."></textarea>
+                            <button class="btn btn-secondary json-viewer-apply" id="btn-apply-json">Apply to Editor</button>
+                        </div>
+                    </details>
                 </div>
 
                 <div class="tab-panel" id="panel-tiptap">
@@ -317,6 +332,7 @@
                 editorJson = data.detail.json;
                 editorHtml = data.detail.html;
                 saveFormState();
+                updateJsonViewer();
             }
             if (data.type === 'ready') {
                 restoreEditorContent();
@@ -407,6 +423,44 @@
         $('panel-plain').classList.add('active');
         $('btn-restore').style.display = 'none';
     }
+
+    // ================================================================
+    // JSON VIEWER (below editor)
+    // ================================================================
+    function updateJsonViewer() {
+        const ta = $('jsonViewerText');
+        if (!ta || !$('jsonViewer').open) return;
+        if (ta === document.activeElement) return; // don't overwrite while user is editing
+        const combined = editorJson ? Object.assign({}, editorJson, { html: editorHtml || '' }) : null;
+        ta.value = combined ? JSON.stringify(combined, null, 2) : '';
+    }
+
+    // Update when viewer is opened
+    $('jsonViewer').addEventListener('toggle', () => {
+        if ($('jsonViewer').open) updateJsonViewer();
+    });
+
+    $('btn-apply-json').addEventListener('click', () => {
+        const ta = $('jsonViewerText');
+        const raw = ta.value.trim();
+        if (!raw) return;
+        try {
+            const parsed = JSON.parse(raw);
+            // Extract html if present, then pass the doc JSON to the editor
+            const html = parsed.html || '';
+            const docJson = Object.assign({}, parsed);
+            delete docJson.html;
+            const iframe = $('tiptapEditorFrame');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({ type: 'set-content', json: docJson }, '*');
+            }
+            editorJson = docJson;
+            editorHtml = html;
+            saveFormState();
+        } catch (e) {
+            alert('Invalid JSON: ' + e.message);
+        }
+    });
 
     // Debounced save for text inputs
     let _saveTimer = null;
