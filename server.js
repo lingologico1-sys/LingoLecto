@@ -14,9 +14,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Environment variables ────────────────────────────────────────────────
 const ELEVEN_API_KEY = process.env.ELEVEN_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || '';
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || '';
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || '';
+const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
+const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
+const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
 const IMAGE_BUCKET_NAME = 'img';
 const IMAGE_DOMAIN = 'https://image.lingologico.com';
 
@@ -260,4 +260,5 @@ app.listen(PORT, () => {
     if (!ELEVEN_API_KEY) console.warn('⚠️  ELEVEN_API_KEY is not set!');
     if (!OPENAI_API_KEY) console.warn('⚠️  OPENAI_API_KEY is not set!');
     if (!R2_ACCESS_KEY_ID) console.warn('⚠️  R2_ACCESS_KEY_ID is not set!');
+    else console.log('R2 config: account=' + R2_ACCOUNT_ID.slice(0,4) + '..., key=' + R2_ACCESS_KEY_ID.slice(0,4) + '..., secret=' + R2_SECRET_ACCESS_KEY.slice(0,4) + '...');
 });
