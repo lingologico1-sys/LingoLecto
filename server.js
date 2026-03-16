@@ -4,7 +4,11 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+// JSON body parser — skip for /api/upload-image (raw binary)
+app.use((req, res, next) => {
+    if (req.path === '/api/upload-image') return next();
+    express.json({ limit: '50mb' })(req, res, next);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Environment variables ────────────────────────────────────────────────
@@ -19,6 +23,11 @@ const IMAGE_DOMAIN = 'https://image.lingologico.com';
 // ── R2 Client ────────────────────────────────────────────────────────────
 function makeR2Client() {
     if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_ACCOUNT_ID) {
+        console.error('R2 credentials missing:', {
+            hasAccessKey: !!R2_ACCESS_KEY_ID,
+            hasSecretKey: !!R2_SECRET_ACCESS_KEY,
+            hasAccountId: !!R2_ACCOUNT_ID
+        });
         return null;
     }
     return new S3Client({
@@ -33,14 +42,22 @@ function makeR2Client() {
 }
 
 // ── R2 Image Upload: server-side proxy (avoids browser CORS on presigned URLs) ──
-app.post('/api/upload-image', express.raw({ type: '*/*', limit: '20mb' }), async (req, res) => {
+app.post('/api/upload-image', async (req, res) => {
     try {
-        if (!req.body || !req.body.length) {
+        // Read raw body manually (no body-parser middleware)
+        const chunks = [];
+        for await (const chunk of req) {
+            chunks.push(chunk);
+        }
+        const body = Buffer.concat(chunks);
+
+        console.log('Upload request received:', body.length, 'bytes');
+
+        if (!body.length) {
             return res.status(400).json({ ok: false, error: 'Empty file body received' });
         }
 
         const fileName = req.headers['x-filename'] || 'image.jpg';
-        // Strip any parameters (e.g. "image/jpeg; charset=utf-8" → "image/jpeg")
         const fileType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim();
 
         const s3 = makeR2Client();
@@ -53,7 +70,7 @@ app.post('/api/upload-image', express.raw({ type: '*/*', limit: '20mb' }), async
             Bucket: IMAGE_BUCKET_NAME,
             Key: key,
             ContentType: fileType,
-            Body: req.body
+            Body: body
         }));
 
         const optimizedFormats = ['image/avif', 'image/webp', 'image/svg+xml', 'image/gif'];
@@ -61,6 +78,7 @@ app.post('/api/upload-image', express.raw({ type: '*/*', limit: '20mb' }), async
             ? `${IMAGE_DOMAIN}/${key}`
             : `${IMAGE_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
 
+        console.log('Upload success:', publicUrl);
         res.json({ ok: true, publicUrl });
     } catch (err) {
         console.error('Image upload error:', err);
