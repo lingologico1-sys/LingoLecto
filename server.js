@@ -156,7 +156,7 @@ app.post('/api/chunk', (req, res) => {
                     model: 'gpt-5.4',
                     prompt: {
                         id: 'pmpt_69b2d7a72cb881969e6ae694840f10bb00fedaf3be2cf1ea',
-                        version: '7',
+                        version: '10',
                         variables: { source_text: sourceText }
                     }
                 })
