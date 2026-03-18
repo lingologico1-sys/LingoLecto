@@ -126,85 +126,110 @@ app.post('/api/upload-url', async (req, res) => {
     }
 });
 
-// ── OpenAI: chunk French text via stored prompt ──────────────────────────
-app.post('/api/chunk', async (req, res) => {
-    try {
-        const { sourceText } = req.body;
+// ── OpenAI: chunk French text via stored prompt (async polling) ──────────
+const chunkJobs = new Map();
 
-        if (!sourceText || !sourceText.trim()) {
-            return res.status(400).json({ error: 'sourceText is required' });
-        }
+app.post('/api/chunk', (req, res) => {
+    const { sourceText } = req.body;
 
-        if (!OPENAI_API_KEY) {
-            return res.status(500).json({ error: 'OPENAI_API_KEY not set' });
-        }
+    if (!sourceText || !sourceText.trim()) {
+        return res.status(400).json({ error: 'sourceText is required' });
+    }
+    if (!OPENAI_API_KEY) {
+        return res.status(500).json({ error: 'OPENAI_API_KEY not set' });
+    }
 
-const apiResponse = await fetch('https://api.openai.com/v1/responses', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + OPENAI_API_KEY
-            },
-            signal: AbortSignal.timeout(480000),
-            body: JSON.stringify({
-                model: 'gpt-5.4',
-                prompt: {
-                    id: 'pmpt_69b2d7a72cb881969e6ae694840f10bb00fedaf3be2cf1ea',
-                    version: '7',
-                    variables: {
-                        source_text: sourceText
+    const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    chunkJobs.set(jobId, { status: 'processing', startedAt: Date.now() });
+
+    // Fire off OpenAI in the background
+    (async () => {
+        try {
+            const apiResponse = await fetch('https://api.openai.com/v1/responses', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + OPENAI_API_KEY
+                },
+                signal: AbortSignal.timeout(480000),
+                body: JSON.stringify({
+                    model: 'gpt-5.4',
+                    prompt: {
+                        id: 'pmpt_69b2d7a72cb881969e6ae694840f10bb00fedaf3be2cf1ea',
+                        version: '7',
+                        variables: { source_text: sourceText }
                     }
-                }
-            })
-        });
-
-        if (!apiResponse.ok) {
-            const errText = await apiResponse.text();
-            return res.status(apiResponse.status).json({
-                error: `OpenAI API Error: ${apiResponse.status} - ${errText}`
+                })
             });
-        }
 
-        const data = await apiResponse.json();
+            if (!apiResponse.ok) {
+                const errText = await apiResponse.text();
+                chunkJobs.set(jobId, { status: 'error', error: `OpenAI API Error: ${apiResponse.status} - ${errText}` });
+                return;
+            }
 
-        let outputText = '';
-        if (data.output) {
-            for (const item of data.output) {
-                if (item.type === 'message' && item.content) {
-                    for (const block of item.content) {
-                        if (block.type === 'output_text') {
-                            outputText += block.text;
+            const data = await apiResponse.json();
+
+            let outputText = '';
+            if (data.output) {
+                for (const item of data.output) {
+                    if (item.type === 'message' && item.content) {
+                        for (const block of item.content) {
+                            if (block.type === 'output_text') {
+                                outputText += block.text;
+                            }
                         }
                     }
                 }
             }
+
+            if (!outputText) {
+                chunkJobs.set(jobId, { status: 'error', error: 'No text output received from OpenAI' });
+                return;
+            }
+
+            let cleaned = outputText.trim();
+            if (cleaned.startsWith('```')) {
+                cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            }
+
+            let readerJson;
+            try {
+                readerJson = JSON.parse(cleaned);
+            } catch (e) {
+                chunkJobs.set(jobId, { status: 'error', error: 'OpenAI returned invalid JSON: ' + e.message, raw: outputText.substring(0, 500) });
+                return;
+            }
+
+            chunkJobs.set(jobId, { status: 'done', result: readerJson });
+        } catch (err) {
+            console.error('Chunk error:', err);
+            chunkJobs.set(jobId, { status: 'error', error: err.message || 'Internal server error' });
         }
 
-        if (!outputText) {
-            return res.status(500).json({ error: 'No text output received from OpenAI' });
-        }
+        // Clean up job after 5 minutes
+        setTimeout(() => chunkJobs.delete(jobId), 300000);
+    })();
 
-        let cleaned = outputText.trim();
-        if (cleaned.startsWith('```')) {
-            cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-        }
+    // Return immediately with the job ID
+    res.json({ jobId });
+});
 
-        let readerJson;
-        try {
-            readerJson = JSON.parse(cleaned);
-        } catch (e) {
-            return res.status(500).json({
-                error: 'OpenAI returned invalid JSON: ' + e.message,
-                raw: outputText.substring(0, 500)
-            });
-        }
+app.get('/api/chunk/:jobId', (req, res) => {
+    const job = chunkJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
 
-        res.json(readerJson);
-
-    } catch (err) {
-        console.error('Chunk error:', err);
-        res.status(500).json({ error: err.message || 'Internal server error' });
+    if (job.status === 'processing') {
+        return res.json({ status: 'processing', elapsed: Date.now() - job.startedAt });
     }
+    if (job.status === 'error') {
+        chunkJobs.delete(req.params.jobId);
+        return res.status(500).json({ status: 'error', error: job.error, raw: job.raw });
+    }
+    // done
+    const result = job.result;
+    chunkJobs.delete(req.params.jobId);
+    res.json({ status: 'done', result });
 });
 
 // ── R2 Audio Upload: save base64 audio to R2 ────────────────────────────

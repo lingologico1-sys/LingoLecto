@@ -677,9 +677,26 @@
                 setStatus('Sending text to OpenAI for chunking & translation…', 'loading');
                 setProgress('chunk');
                 startPipelineTimer('chunk');
-                const chunkRes = await fetch('/api/chunk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceText }) });
-                if (!chunkRes.ok) { const err = await chunkRes.json().catch(() => ({ error: `HTTP ${chunkRes.status}` })); throw new Error(err.error || `OpenAI failed: ${chunkRes.status}`); }
-                readerData = await chunkRes.json();
+
+                // Start async job
+                const startRes = await fetch('/api/chunk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceText }) });
+                if (!startRes.ok) { const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` })); throw new Error(err.error || `Chunk start failed: ${startRes.status}`); }
+                const { jobId } = await startRes.json();
+
+                // Poll for result
+                readerData = await new Promise((resolve, reject) => {
+                    const poll = async () => {
+                        try {
+                            const pollRes = await fetch('/api/chunk/' + jobId);
+                            const data = await pollRes.json();
+                            if (data.status === 'processing') { setTimeout(poll, 2000); return; }
+                            if (data.status === 'error') { reject(new Error(data.error || 'Chunking failed')); return; }
+                            resolve(data.result);
+                        } catch (e) { reject(e); }
+                    };
+                    poll();
+                });
+
                 stopPipelineTimer();
                 if (!readerData.chunks || !readerData.chunks.length) throw new Error('OpenAI returned no chunks.');
                 sourceText = readerData.chunks.map(c => c.source).join('');
