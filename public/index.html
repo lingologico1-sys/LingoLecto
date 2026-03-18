@@ -92,6 +92,9 @@
         .progress-step.active { color: white; background: var(--accent); }
         .progress-step.done { color: var(--success); background: var(--success-bg); }
         .progress-arrow { color: var(--border); font-size: 12px; }
+        .progress-bar-wrap { width: 100%; height: 6px; background: var(--border-light); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.3s ease; }
+        .progress-timer { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
         /* TipTap Editor Embed */
         .tiptap-editor-frame { width: 100%; height: 500px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -253,6 +256,10 @@
                     <span class="progress-arrow">→</span>
                     <span class="progress-step" id="step-done">3 Done</span>
                 </div>
+                <div class="progress-bar-wrap" id="progress-bar-wrap" style="display:none;">
+                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                </div>
+                <div class="progress-timer" id="progress-timer" style="display:none;"></div>
                 <span id="status-text"></span>
             </div>
         </div>
@@ -517,7 +524,11 @@
     function setStatus(msg, type) {
         $('status-text').textContent = msg;
         $('status-msg').className = 'status-msg ' + (type || '');
-        if (type !== 'loading') $('progress-steps').style.display = 'none';
+        if (type !== 'loading') {
+            $('progress-steps').style.display = 'none';
+            $('progress-bar-wrap').style.display = 'none';
+            $('progress-timer').style.display = 'none';
+        }
     }
 
     function setProgress(step) {
@@ -526,6 +537,83 @@
         if (step === 'chunk') $('step-chunk').classList.add('active');
         else if (step === 'audio') { $('step-chunk').classList.add('done'); $('step-audio').classList.add('active'); }
         else if (step === 'done') { $('step-chunk').classList.add('done'); $('step-audio').classList.add('done'); $('step-done').classList.add('active'); }
+    }
+
+    // ================================================================
+    // PIPELINE TIMING & PROGRESS BAR
+    // ================================================================
+    const TIMING_KEY = 'lingoreader-timing';
+    let pipelineTimerRAF = null;
+    let pipelineStartTime = 0;
+    let currentStepKey = null;
+
+    function loadTimingHistory() {
+        try { return JSON.parse(localStorage.getItem(TIMING_KEY)) || {}; } catch { return {}; }
+    }
+
+    function saveTimingEntry(stepKey, durationMs) {
+        const hist = loadTimingHistory();
+        if (!hist[stepKey]) hist[stepKey] = [];
+        hist[stepKey].push(durationMs);
+        if (hist[stepKey].length > 5) hist[stepKey] = hist[stepKey].slice(-5);
+        localStorage.setItem(TIMING_KEY, JSON.stringify(hist));
+    }
+
+    function getAverageMs(stepKey) {
+        const hist = loadTimingHistory();
+        const arr = hist[stepKey];
+        if (!arr || !arr.length) return 0;
+        return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+
+    function formatTime(ms) {
+        const s = Math.floor(ms / 1000);
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
+    }
+
+    function startPipelineTimer(stepKey) {
+        currentStepKey = stepKey;
+        pipelineStartTime = Date.now();
+        const avgMs = getAverageMs(stepKey);
+        $('progress-bar-wrap').style.display = 'block';
+        $('progress-timer').style.display = 'block';
+        $('progress-bar-fill').style.width = '0%';
+
+        function tick() {
+            const elapsed = Date.now() - pipelineStartTime;
+            let timerText = formatTime(elapsed);
+            if (avgMs > 0) {
+                const pct = Math.min((elapsed / avgMs) * 100, 95);
+                $('progress-bar-fill').style.width = pct + '%';
+                timerText += ` / ~${formatTime(avgMs)} avg`;
+            } else {
+                // No history — show indeterminate-style slow fill
+                const pct = Math.min((elapsed / 120000) * 50, 50);
+                $('progress-bar-fill').style.width = pct + '%';
+            }
+            $('progress-timer').textContent = timerText;
+            pipelineTimerRAF = requestAnimationFrame(tick);
+        }
+        pipelineTimerRAF = requestAnimationFrame(tick);
+    }
+
+    function stopPipelineTimer() {
+        if (pipelineTimerRAF) { cancelAnimationFrame(pipelineTimerRAF); pipelineTimerRAF = null; }
+        const elapsed = Date.now() - pipelineStartTime;
+        if (currentStepKey && elapsed > 0) saveTimingEntry(currentStepKey, elapsed);
+        $('progress-bar-fill').style.width = '100%';
+        const stepKey = currentStepKey;
+        currentStepKey = null;
+        return elapsed;
+    }
+
+    function resetPipelineUI() {
+        if (pipelineTimerRAF) { cancelAnimationFrame(pipelineTimerRAF); pipelineTimerRAF = null; }
+        $('progress-bar-wrap').style.display = 'none';
+        $('progress-timer').style.display = 'none';
+        $('progress-bar-fill').style.width = '0%';
     }
 
     function extractTextFromHtml(html) {
@@ -588,24 +676,29 @@
             if (needsChunking) {
                 setStatus('Sending text to OpenAI for chunking & translation…', 'loading');
                 setProgress('chunk');
+                startPipelineTimer('chunk');
                 const chunkRes = await fetch('/api/chunk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceText }) });
                 if (!chunkRes.ok) { const err = await chunkRes.json().catch(() => ({ error: `HTTP ${chunkRes.status}` })); throw new Error(err.error || `OpenAI failed: ${chunkRes.status}`); }
                 readerData = await chunkRes.json();
+                stopPipelineTimer();
                 if (!readerData.chunks || !readerData.chunks.length) throw new Error('OpenAI returned no chunks.');
                 sourceText = readerData.chunks.map(c => c.source).join('');
             }
 
             setStatus('Generating audio with ElevenLabs…', 'loading');
             setProgress('audio');
+            startPipelineTimer('audio');
             const audioRes = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voiceId, text: sourceText, stability: parseFloat(stabilityEl.value), similarity_boost: parseFloat(similarityEl.value), style: parseFloat(styleEl.value), use_speaker_boost: $('use_speaker_boost').checked }) });
             if (!audioRes.ok) { const err = await audioRes.json().catch(() => ({ error: `HTTP ${audioRes.status}` })); throw new Error(err.error || `ElevenLabs failed: ${audioRes.status}`); }
             const audioData = await audioRes.json();
+            stopPipelineTimer();
 
             setProgress('done');
+            resetPipelineUI();
             state.readerData = readerData; state.alignmentData = audioData.alignment || null; state.tiptapData = tiptapData; state.audioBase64 = audioData.audio_base64 || null; state.audioUrl = null; state.tappedIds = new Set(); state.tapCount = 0;
             saveState();
             showReaderView();
-        } catch (err) { console.error('Pipeline error:', err); setStatus(err.message || 'Something went wrong.', 'error'); }
+        } catch (err) { console.error('Pipeline error:', err); resetPipelineUI(); setStatus(err.message || 'Something went wrong.', 'error'); }
         finally { $('btn-generate').disabled = false; }
     });
 
