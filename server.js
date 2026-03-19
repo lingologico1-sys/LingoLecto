@@ -17,10 +17,8 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
 const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
 const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
-const IMAGE_BUCKET_NAME = 'img';
-const IMAGE_DOMAIN = 'https://image.lingomondo.app';
-const AUDIO_BUCKET_NAME = 'aud';
-const AUDIO_DOMAIN = 'https://audio.lingomondo.app';
+const LECTO_BUCKET = 'lecto';
+const LECTO_DOMAIN = 'https://lecto.lingomondo.app';
 
 // ── R2 Client ────────────────────────────────────────────────────────────
 function makeR2Client() {
@@ -66,10 +64,10 @@ app.post('/api/upload-image', async (req, res) => {
         if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
 
         const cleanName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const key = `lingoscribo/${Date.now()}_${cleanName}`;
+        const key = `img/${Date.now()}_${cleanName}`;
 
         await s3.send(new PutObjectCommand({
-            Bucket: IMAGE_BUCKET_NAME,
+            Bucket: LECTO_BUCKET,
             Key: key,
             ContentType: fileType,
             Body: body
@@ -77,8 +75,8 @@ app.post('/api/upload-image', async (req, res) => {
 
         const optimizedFormats = ['image/avif', 'image/webp', 'image/svg+xml', 'image/gif'];
         const publicUrl = optimizedFormats.includes(fileType)
-            ? `${IMAGE_DOMAIN}/${key}`
-            : `${IMAGE_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
+            ? `${LECTO_DOMAIN}/${key}`
+            : `${LECTO_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
 
         console.log('Upload success:', publicUrl);
         res.json({ ok: true, publicUrl });
@@ -103,10 +101,10 @@ app.post('/api/upload-url', async (req, res) => {
         }
 
         const cleanName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const key = `lingoscribo/${Date.now()}_${cleanName}`;
+        const key = `img/${Date.now()}_${cleanName}`;
 
         const command = new PutObjectCommand({
-            Bucket: IMAGE_BUCKET_NAME,
+            Bucket: LECTO_BUCKET,
             Key: key,
             ContentType: fileType
         });
@@ -115,8 +113,8 @@ app.post('/api/upload-url', async (req, res) => {
 
         const optimizedFormats = ['image/avif', 'image/webp', 'image/svg+xml', 'image/gif'];
         const publicUrl = optimizedFormats.includes(fileType)
-            ? `${IMAGE_DOMAIN}/${key}`
-            : `${IMAGE_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
+            ? `${LECTO_DOMAIN}/${key}`
+            : `${LECTO_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
 
         res.json({ ok: true, uploadUrl, publicUrl });
 
@@ -156,7 +154,7 @@ app.post('/api/chunk', (req, res) => {
                     model: 'gpt-5.4',
                     prompt: {
                         id: 'pmpt_69b2d7a72cb881969e6ae694840f10bb00fedaf3be2cf1ea',
-                        version: '10',
+                        version: '11',
                         variables: { source_text: sourceText }
                     }
                 })
@@ -232,35 +230,86 @@ app.get('/api/chunk/:jobId', (req, res) => {
     res.json({ status: 'done', result });
 });
 
-// ── R2 Audio Upload: save base64 audio to R2 ────────────────────────────
-app.post('/api/upload-audio', async (req, res) => {
+// ── Publish: upload audio + images + consolidated JSON to lecto bucket ──
+app.post('/api/publish', async (req, res) => {
     try {
-        const { audioBase64, fileName } = req.body;
+        const { title, readerData, tiptapData, alignmentData, audioBase64 } = req.body;
 
-        if (!audioBase64) {
-            return res.status(400).json({ ok: false, error: 'audioBase64 is required' });
-        }
+        if (!title) return res.status(400).json({ ok: false, error: 'title is required' });
+        if (!readerData) return res.status(400).json({ ok: false, error: 'readerData is required' });
+        if (!audioBase64) return res.status(400).json({ ok: false, error: 'audioBase64 is required' });
 
         const s3 = makeR2Client();
         if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
 
-        const buf = Buffer.from(audioBase64, 'base64');
-        const cleanName = (fileName || 'audio.mp3').replace(/[^a-zA-Z0-9.-]/g, '_');
-        const key = `lingoscribo/${Date.now()}_${cleanName}`;
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+        // 1. Upload audio
+        const audioBuf = Buffer.from(audioBase64, 'base64');
+        const audioKey = `aud/${slug}.mp3`;
         await s3.send(new PutObjectCommand({
-            Bucket: AUDIO_BUCKET_NAME,
-            Key: key,
+            Bucket: LECTO_BUCKET,
+            Key: audioKey,
             ContentType: 'audio/mpeg',
-            Body: buf
+            Body: audioBuf
         }));
+        const audioUrl = `${LECTO_DOMAIN}/${audioKey}`;
+        console.log('Published audio:', audioUrl);
 
-        const publicUrl = `${AUDIO_DOMAIN}/${key}`;
-        console.log('Audio upload success:', publicUrl);
-        res.json({ ok: true, publicUrl });
+        // 2. Migrate images from old domain → lecto bucket, rewrite URLs in tiptap HTML
+        let processedHtml = (tiptapData && tiptapData.html) || '';
+        const oldImageRegex = /https:\/\/image\.lingomondo\.app\/(cdn-cgi\/image\/[^/]+\/)?(lingoscribo\/[^"'\s)]+)/g;
+        const matches = [...processedHtml.matchAll(oldImageRegex)];
+        for (const match of matches) {
+            const fullUrl = match[0];
+            const originalKey = match[2]; // e.g. lingoscribo/12345_file.jpg
+            const filename = originalKey.replace('lingoscribo/', '');
+            const newKey = `img/${filename}`;
+            try {
+                const imgRes = await fetch(fullUrl);
+                if (imgRes.ok) {
+                    const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+                    const ct = imgRes.headers.get('content-type') || 'image/jpeg';
+                    await s3.send(new PutObjectCommand({
+                        Bucket: LECTO_BUCKET,
+                        Key: newKey,
+                        ContentType: ct,
+                        Body: imgBuf
+                    }));
+                    processedHtml = processedHtml.split(fullUrl).join(`${LECTO_DOMAIN}/${newKey}`);
+                    console.log('Migrated image:', fullUrl, '→', `${LECTO_DOMAIN}/${newKey}`);
+                }
+            } catch (imgErr) {
+                console.error('Image migration failed for', fullUrl, imgErr.message);
+            }
+        }
+
+        // 3. Build consolidated JSON
+        const consolidated = {
+            title,
+            slug,
+            source_language: readerData.source_language,
+            chunks: readerData.chunks,
+            tiptap_html: processedHtml,
+            alignment: alignmentData || null,
+            audio_url: audioUrl
+        };
+
+        // 4. Upload JSON
+        const jsonKey = `json/${slug}.json`;
+        await s3.send(new PutObjectCommand({
+            Bucket: LECTO_BUCKET,
+            Key: jsonKey,
+            ContentType: 'application/json',
+            Body: JSON.stringify(consolidated)
+        }));
+        const jsonUrl = `${LECTO_DOMAIN}/${jsonKey}`;
+        console.log('Published JSON:', jsonUrl);
+
+        res.json({ ok: true, jsonUrl, audioUrl });
     } catch (err) {
-        console.error('Audio upload error:', err);
-        res.status(500).json({ ok: false, error: err.message || 'Upload failed' });
+        console.error('Publish error:', err);
+        res.status(500).json({ ok: false, error: err.message || 'Publish failed' });
     }
 });
 

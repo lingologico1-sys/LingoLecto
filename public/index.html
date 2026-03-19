@@ -301,10 +301,6 @@
         <div class="reader-panel active" id="rpanel-reader">
             <div class="reader-container">
                 <div class="audio-container" id="audio-container"></div>
-                <div id="audio-save-row" style="display:none; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
-                    <button class="btn btn-secondary" id="btn-save-audio">Save Audio to Cloud</button>
-                    <span id="audio-save-status" style="font-size:12px; color:var(--text-secondary);"></span>
-                </div>
                 <div class="reader-text" id="reader-text"></div>
             </div>
         </div>
@@ -312,6 +308,13 @@
         <!-- Data Panel -->
         <div class="reader-panel" id="rpanel-data">
             <div class="data-container">
+
+                <div class="data-section">
+                    <div class="data-section-header">
+                        <div class="data-section-title">Title</div>
+                    </div>
+                    <input type="text" id="data-title" placeholder="Enter lesson title..." style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; background:var(--surface); color:var(--ink); box-sizing:border-box;" />
+                </div>
 
                 <div class="data-section">
                     <div class="data-section-header">
@@ -361,12 +364,6 @@
                     </div>
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <button class="btn-sm" id="btn-download-audio">Download .mp3</button>
-                        <button class="btn-sm" id="btn-save-audio-data">Save to Cloud</button>
-                        <span id="data-audio-save-status" style="font-size:11px; color:var(--text-secondary);"></span>
-                    </div>
-                    <div class="data-url" id="data-audio-url-row" style="display:none; margin-top:8px;">
-                        <a id="data-audio-url-link" href="#" target="_blank"></a>
-                        <button class="btn-sm" id="btn-copy-audio-url">Copy</button>
                     </div>
                 </div>
 
@@ -400,6 +397,17 @@
                         </div>
                         <button class="btn btn-primary" id="btn-regen-audio" style="margin-top:12px;">Regenerate Audio</button>
                         <div class="data-regen-status" id="data-regen-status"></div>
+                    </div>
+                </div>
+
+                <div class="data-section" style="margin-top:32px; border-top:1px solid var(--border); padding-top:24px;">
+                    <div class="data-section-header">
+                        <div class="data-section-title">Publish</div>
+                    </div>
+                    <button class="btn btn-primary" id="btn-publish" style="margin-top:8px;">Upload to Cloudflare</button>
+                    <div id="publish-status" style="margin-top:8px; font-size:12px; color:var(--text-secondary);"></div>
+                    <div id="publish-result" style="display:none; margin-top:8px;">
+                        <div class="data-url"><a id="publish-json-url" href="#" target="_blank"></a><button class="btn-sm" id="btn-copy-publish-url">Copy</button></div>
                     </div>
                 </div>
 
@@ -873,14 +881,6 @@
         const ac = $('audio-container');
         ac.innerHTML = state.audioBase64 ? `<audio id="readerAudio" controls src="${state.audioUrl || ('data:audio/mpeg;base64,' + state.audioBase64)}"></audio>` : '';
 
-        const saveRow = $('audio-save-row');
-        if (state.audioBase64) {
-            saveRow.style.display = 'flex';
-            $('audio-save-status').textContent = state.audioUrl ? 'Saved: ' + state.audioUrl : '';
-        } else {
-            saveRow.style.display = 'none';
-        }
-
         const rt = $('reader-text');
         const useTiptap = state.tiptapData && state.tiptapData.html;
         if (useTiptap) { rt.innerHTML = buildTiptapWithChunks(); rt.className = 'reader-text tiptap-rich'; }
@@ -893,34 +893,6 @@
         langSelect.addEventListener('change', () => { if (activeChunkEl) { const c = chunkMap.get(activeChunkEl.getAttribute('data-id')); if (c) showTooltip(activeChunkEl, c); } });
         if (state.audioBase64 && state.alignmentData) setupAudioSync();
     }
-
-    // ── Save Audio to R2 ──
-    $('btn-save-audio').addEventListener('click', async () => {
-        if (!state.audioBase64) return;
-        const btn = $('btn-save-audio');
-        const status = $('audio-save-status');
-        btn.disabled = true;
-        status.textContent = 'Uploading...';
-        try {
-            const res = await fetch('/api/upload-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ audioBase64: state.audioBase64, fileName: 'audio.mp3' })
-            });
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Upload failed');
-            state.audioUrl = data.publicUrl;
-            saveState();
-            status.textContent = 'Saved: ' + data.publicUrl;
-            // Switch audio element to use the cloud URL
-            const audioEl = document.getElementById('readerAudio');
-            if (audioEl) audioEl.src = data.publicUrl;
-        } catch (e) {
-            status.textContent = 'Error: ' + e.message;
-        } finally {
-            btn.disabled = false;
-        }
-    });
 
     // ================================================================
     // READER TABS (Reader / Data)
@@ -949,15 +921,6 @@
         // Audio alignment JSON
         $('data-audio-json').value = state.alignmentData ? JSON.stringify(state.alignmentData, null, 2) : '(no alignment data)';
 
-        // Audio URL
-        if (state.audioUrl) {
-            $('data-audio-url-row').style.display = 'flex';
-            $('data-audio-url-link').href = state.audioUrl;
-            $('data-audio-url-link').textContent = state.audioUrl;
-        } else {
-            $('data-audio-url-row').style.display = 'none';
-        }
-
         // Sync voice settings from setup
         $('data-voiceId').value = $('voiceId').value;
         $('data-stability').value = $('stability').value;
@@ -982,7 +945,6 @@
     $('btn-copy-chunks').addEventListener('click', () => copyToClipboard($('data-chunks-json').value, $('btn-copy-chunks')));
     $('btn-copy-tiptap-data').addEventListener('click', () => copyToClipboard($('data-tiptap-json').value, $('btn-copy-tiptap-data')));
     $('btn-copy-audio-json').addEventListener('click', () => copyToClipboard($('data-audio-json').value, $('btn-copy-audio-json')));
-    $('btn-copy-audio-url').addEventListener('click', () => copyToClipboard($('data-audio-url-link').textContent, $('btn-copy-audio-url')));
 
     // Apply chunking JSON
     $('btn-apply-chunks').addEventListener('click', () => {
@@ -1024,36 +986,6 @@
         a.href = 'data:audio/mpeg;base64,' + state.audioBase64;
         a.download = 'audio.mp3';
         a.click();
-    });
-
-    // Save audio from data panel
-    $('btn-save-audio-data').addEventListener('click', async () => {
-        if (!state.audioBase64) { alert('No audio available'); return; }
-        const btn = $('btn-save-audio-data');
-        const status = $('data-audio-save-status');
-        btn.disabled = true;
-        status.textContent = 'Uploading...';
-        try {
-            const res = await fetch('/api/upload-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ audioBase64: state.audioBase64, fileName: 'audio.mp3' })
-            });
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Upload failed');
-            state.audioUrl = data.publicUrl;
-            saveState();
-            status.textContent = 'Saved!';
-            $('data-audio-url-row').style.display = 'flex';
-            $('data-audio-url-link').href = data.publicUrl;
-            $('data-audio-url-link').textContent = data.publicUrl;
-            const audioEl = document.getElementById('readerAudio');
-            if (audioEl) audioEl.src = data.publicUrl;
-            // Also update reader panel status
-            $('audio-save-status').textContent = 'Saved: ' + data.publicUrl;
-        } catch (e) {
-            status.textContent = 'Error: ' + e.message;
-        } finally { btn.disabled = false; }
     });
 
     // Data panel slider labels
@@ -1105,7 +1037,6 @@
             status.textContent = 'Audio regenerated successfully!';
             // Update audio JSON display
             $('data-audio-json').value = state.alignmentData ? JSON.stringify(state.alignmentData, null, 2) : '';
-            $('data-audio-url-row').style.display = 'none';
 
             // Re-render reader with new audio
             renderReader();
@@ -1113,6 +1044,50 @@
             status.textContent = 'Error: ' + e.message;
         } finally { btn.disabled = false; }
     });
+
+    // ── Publish to Cloudflare ──
+    $('btn-publish').addEventListener('click', async () => {
+        const title = $('data-title').value.trim();
+        if (!title) { alert('Please enter a title'); $('data-title').focus(); return; }
+        if (!state.readerData) { alert('No reader data available'); return; }
+        if (!state.audioBase64) { alert('No audio available to publish'); return; }
+
+        const btn = $('btn-publish');
+        const status = $('publish-status');
+        btn.disabled = true;
+        status.textContent = 'Publishing...';
+        $('publish-result').style.display = 'none';
+
+        try {
+            const res = await fetch('/api/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title,
+                    readerData: state.readerData,
+                    tiptapData: state.tiptapData,
+                    alignmentData: state.alignmentData,
+                    audioBase64: state.audioBase64
+                })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Publish failed');
+
+            status.textContent = 'Published successfully!';
+            $('publish-result').style.display = 'block';
+            $('publish-json-url').href = data.jsonUrl;
+            $('publish-json-url').textContent = data.jsonUrl;
+
+            state.audioUrl = data.audioUrl;
+            saveState();
+        } catch (e) {
+            status.textContent = 'Error: ' + e.message;
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    $('btn-copy-publish-url').addEventListener('click', () => copyToClipboard($('publish-json-url').textContent, $('btn-copy-publish-url')));
 
     function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
