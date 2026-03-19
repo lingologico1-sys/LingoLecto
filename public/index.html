@@ -13,7 +13,7 @@
         :root {
             --ink: #1a1a2e; --paper: #f8f5f0; --cream: #fffdf9;
             --accent: #c2703e; --accent-light: #f0d9c8; --accent-glow: rgba(194,112,62,0.12); --accent-deep: #a85a2a;
-            --highlight-audio: rgba(223,164,89,0.35);
+            /* --highlight-audio removed: karaoke text color used instead */
             --text-secondary: #6b6570; --border: #ddd5cb; --border-light: #ece6de;
             --surface: #ffffff; --error: #c23838; --error-bg: #fdf0f0;
             --success: #2d7a4f; --success-bg: #edf7f0;
@@ -119,8 +119,8 @@
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
         .chunk:hover { background: var(--accent-glow); color: var(--accent); }
-        .chunk.tapped { background: var(--accent-glow); border-bottom: 2px solid var(--accent); padding-bottom: 0; }
-        .chunk.active-audio { background: var(--highlight-audio); border-radius: 4px; transition: background 0.1s; }
+        .chunk.tapped { background: rgba(194,112,62,0.08); border-bottom: 2px solid var(--accent); padding-bottom: 0; }
+        .chunk.active-audio { color: var(--accent); font-weight: 600; transition: color 0.15s, font-weight 0.15s; }
 
         .reader-text.tiptap-rich img { max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; }
         .reader-text.tiptap-rich table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 16px; }
@@ -131,6 +131,7 @@
         .reader-text.tiptap-rich ul, .reader-text.tiptap-rich ol { padding-left: 24px; margin-bottom: 16px; }
         .reader-text.tiptap-rich .chunk { font: inherit; color: inherit; letter-spacing: inherit; }
         .reader-text.tiptap-rich .chunk:hover { background: var(--accent-glow); }
+        .reader-text.tiptap-rich .chunk.active-audio { color: var(--accent); }
 
         .stats-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--border); padding: 12px 32px; display: flex; align-items: center; justify-content: center; gap: 32px; font-size: 13px; color: var(--text-secondary); z-index: 100; }
         .stat-num { font-weight: 600; color: var(--ink); }
