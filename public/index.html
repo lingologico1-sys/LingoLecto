@@ -594,6 +594,8 @@
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         $('panel-lectos').classList.add('active');
         $('btn-restore').style.display = 'none';
+        state.readerData = null; state.audioBase64 = null; state.audioUrl = null; state.alignmentData = null; state.tiptapData = null; state.tapCount = 0; state.tappedIds = new Set();
+        showSetupView();
     }
 
     // ================================================================
