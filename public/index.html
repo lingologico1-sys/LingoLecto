@@ -115,6 +115,8 @@
         .audio-btns { display: flex; gap: 8px; margin-top: 8px; }
         .audio-btns button { flex: 1; padding: 6px 0; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--ink); cursor: pointer; transition: background 0.15s; }
         .audio-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+        .kbd-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+        .kbd-legend kbd { display: inline-block; padding: 1px 5px; font-size: 11px; font-family: inherit; background: var(--card); border: 1px solid var(--border); border-radius: 3px; box-shadow: 0 1px 0 var(--border); }
         .reader-text { font-family: 'Lora', Georgia, serif; font-size: 20px; line-height: 1.85; color: var(--ink); letter-spacing: 0.01em; }
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
@@ -895,7 +897,7 @@
 
         const ac = $('audio-container');
         const audioSrc = state.audioUrl || (state.audioBase64 ? 'data:audio/mpeg;base64,' + state.audioBase64 : null);
-        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div>` : '';
+        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div><div class="kbd-legend"><span><kbd>Space</kbd> / <kbd>↓</kbd> Play/Pause</span><span><kbd>←</kbd> Prev Sentence</span><span><kbd>→</kbd> Next Sentence</span><span><kbd>↑</kbd> Rewind</span></div>` : '';
 
         const rt = $('reader-text');
         const useTiptap = state.tiptapData && state.tiptapData.html;
@@ -1220,12 +1222,92 @@
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
         audio.addEventListener('play', () => { syncRAF = requestAnimationFrame(loop); }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); }); audio.addEventListener('seeked', update); audio.addEventListener('timeupdate', update);
 
-        // Spacebar toggles play/pause (ignore when typing in inputs)
+        const chunks = state.readerData.chunks;
+
+        // --- Sentence navigation helpers ---
+        const findCurrentIdx = () => {
+            const t = audio.currentTime;
+            let curIdx = -1;
+            for (let i = 0; i < chunks.length; i++) {
+                if (chunks[i].audioStart === null) continue;
+                if (t >= chunks[i].audioStart - 0.05) curIdx = i;
+                else break;
+            }
+            return curIdx;
+        };
+        const findSentenceStart = (fromIdx) => {
+            let si = fromIdx;
+            for (let i = fromIdx - 1; i >= 0; i--) {
+                if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
+                si = i;
+            }
+            return si;
+        };
+        const firstValidTime = (idx) => {
+            for (let i = idx; i < chunks.length; i++) {
+                if (chunks[i].audioStart !== null) return chunks[i].audioStart;
+            }
+            return 0;
+        };
+        const safeSeek = (seekTo) => {
+            if (audio.readyState >= 1 && isFinite(audio.duration)) {
+                audio.currentTime = seekTo;
+            } else {
+                audio.addEventListener('loadedmetadata', function onMeta() {
+                    audio.removeEventListener('loadedmetadata', onMeta);
+                    audio.currentTime = seekTo;
+                });
+                audio.load();
+            }
+        };
+        const seekPrevSentence = () => {
+            const curIdx = findCurrentIdx();
+            if (curIdx < 0) { audio.currentTime = 0; return; }
+            const sentenceStart = findSentenceStart(curIdx);
+            let seekTo;
+            if (curIdx <= sentenceStart && sentenceStart > 0) {
+                seekTo = firstValidTime(findSentenceStart(sentenceStart - 1));
+            } else {
+                seekTo = firstValidTime(sentenceStart);
+            }
+            safeSeek(seekTo);
+        };
+        const seekNextSentence = () => {
+            const curIdx = findCurrentIdx();
+            if (curIdx < 0) { safeSeek(firstValidTime(0)); return; }
+            // Find end of current sentence, then start of next
+            let i = curIdx;
+            while (i < chunks.length && !/[.!?]$/.test(chunks[i].source.trimEnd())) i++;
+            // i is now the last chunk of the current sentence (with punctuation), move to next
+            const nextIdx = i + 1;
+            if (nextIdx < chunks.length) {
+                safeSeek(firstValidTime(nextIdx));
+            }
+            // If no next sentence, do nothing (already at end)
+        };
+
+        // --- Keyboard shortcuts ---
         const onKeyDown = (e) => {
-            if (e.code !== 'Space') return;
             if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
-            e.preventDefault();
-            audio.paused ? audio.play() : audio.pause();
+            switch (e.code) {
+                case 'Space':
+                case 'ArrowDown':
+                    e.preventDefault();
+                    audio.paused ? audio.play() : audio.pause();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    seekPrevSentence();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    seekNextSentence();
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    audio.currentTime = 0;
+                    break;
+            }
         };
         document.addEventListener('keydown', onKeyDown);
         audio.addEventListener('emptied', () => document.removeEventListener('keydown', onKeyDown));
@@ -1236,69 +1318,7 @@
 
         // Sentence-start button
         const btnSentence = document.getElementById('btn-sentence');
-        if (btnSentence) btnSentence.addEventListener('click', (e) => { e.stopPropagation();
-            const chunks = state.readerData.chunks;
-            const t = audio.currentTime;
-            console.log('=== CHUNK DIAGNOSTIC (t=' + t.toFixed(3) + ') ===');
-            chunks.forEach((c, i) => {
-                const trimmed = c.source.trimEnd();
-                const hasPunct = /[.!?]$/.test(trimmed);
-                console.log(`[${i}] as=${c.audioStart !== null ? c.audioStart.toFixed(3) : 'NULL'} punct=${hasPunct} src=${JSON.stringify(c.source)}`);
-            });
-            console.log('=== END DIAGNOSTIC ===');
-
-            // Find last chunk that has started (skip null-timestamp chunks rather than breaking on them)
-            let curIdx = -1;
-            for (let i = 0; i < chunks.length; i++) {
-                if (chunks[i].audioStart === null) continue;
-                if (t >= chunks[i].audioStart - 0.05) curIdx = i;
-                else break;
-            }
-            if (curIdx < 0) { audio.currentTime = 0; return; }
-
-            // Find the index of the first chunk of the sentence containing fromIdx
-            const findSentenceStart = (fromIdx) => {
-                let si = fromIdx;
-                for (let i = fromIdx - 1; i >= 0; i--) {
-                    if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
-                    si = i;
-                }
-                return si;
-            };
-
-            // Get the audioStart of the first chunk at/after idx that has a real timestamp
-            const firstValidTime = (idx) => {
-                for (let i = idx; i < chunks.length; i++) {
-                    if (chunks[i].audioStart !== null) return chunks[i].audioStart;
-                }
-                return 0;
-            };
-
-            const sentenceStart = findSentenceStart(curIdx);
-            const sentenceStartTime = firstValidTime(sentenceStart);
-
-            // If already on the first chunk of the sentence, jump to the previous sentence instead
-            let seekTo;
-            if (curIdx <= sentenceStart && sentenceStart > 0) {
-                seekTo = firstValidTime(findSentenceStart(sentenceStart - 1));
-            } else {
-                seekTo = sentenceStartTime;
-            }
-            console.log('[sentence-btn] curIdx='+curIdx+' sentenceStart='+sentenceStart+' seekTo='+seekTo+' readyState='+audio.readyState+' duration='+audio.duration);
-            if (audio.readyState >= 1 && isFinite(audio.duration)) {
-                audio.currentTime = seekTo;
-                console.log('[sentence-btn] after seek, audio.currentTime='+audio.currentTime);
-            } else {
-                // Audio metadata not loaded yet — wait for it
-                console.log('[sentence-btn] waiting for loadedmetadata...');
-                audio.addEventListener('loadedmetadata', function onMeta() {
-                    audio.removeEventListener('loadedmetadata', onMeta);
-                    audio.currentTime = seekTo;
-                    console.log('[sentence-btn] after deferred seek, audio.currentTime='+audio.currentTime);
-                });
-                audio.load();
-            }
-        });
+        if (btnSentence) btnSentence.addEventListener('click', (e) => { e.stopPropagation(); seekPrevSentence(); });
     }
 
     // ================================================================
