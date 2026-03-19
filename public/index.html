@@ -111,6 +111,9 @@
         .reader-container { max-width: 680px; margin: 0 auto; padding: 40px 32px 100px; animation: fadeUp 0.4s ease-out; }
         .audio-container { margin-bottom: 32px; }
         .audio-container audio { width: 100%; height: 44px; border-radius: 8px; outline: none; }
+        .audio-btns { display: flex; gap: 8px; margin-top: 8px; }
+        .audio-btns button { flex: 1; padding: 6px 0; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--ink); cursor: pointer; transition: background 0.15s; }
+        .audio-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
         .reader-text { font-family: 'Lora', Georgia, serif; font-size: 20px; line-height: 1.85; color: var(--ink); letter-spacing: 0.01em; }
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
@@ -890,7 +893,7 @@
 
         const ac = $('audio-container');
         const audioSrc = state.audioUrl || (state.audioBase64 ? 'data:audio/mpeg;base64,' + state.audioBase64 : null);
-        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls src="${audioSrc}"></audio>` : '';
+        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div>` : '';
 
         const rt = $('reader-text');
         const useTiptap = state.tiptapData && state.tiptapData.html;
@@ -1214,6 +1217,39 @@
         const update = () => { const t = audio.currentTime; let aid = null; for (const c of state.readerData.chunks) { if (c.audioStart !== null && c.audioEnd !== null && t >= c.audioStart && t <= c.audioEnd + 0.1) { aid = c.id; break; } } if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; } };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
         audio.addEventListener('play', () => { syncRAF = requestAnimationFrame(loop); }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); }); audio.addEventListener('seeked', update); audio.addEventListener('timeupdate', update);
+
+        // Spacebar toggles play/pause (ignore when typing in inputs)
+        const onKeyDown = (e) => {
+            if (e.code !== 'Space') return;
+            if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+            e.preventDefault();
+            audio.paused ? audio.play() : audio.pause();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        audio.addEventListener('emptied', () => document.removeEventListener('keydown', onKeyDown));
+
+        // Rewind button
+        const btnRewind = document.getElementById('btn-rewind');
+        if (btnRewind) btnRewind.addEventListener('click', () => { audio.currentTime = 0; });
+
+        // Sentence-start button
+        const btnSentence = document.getElementById('btn-sentence');
+        if (btnSentence) btnSentence.addEventListener('click', () => {
+            const chunks = state.readerData.chunks;
+            const t = audio.currentTime;
+            let curIdx = -1;
+            for (let i = 0; i < chunks.length; i++) {
+                if (chunks[i].audioStart !== null && chunks[i].audioEnd !== null && t >= chunks[i].audioStart - 0.05) curIdx = i;
+                else if (curIdx >= 0) break;
+            }
+            if (curIdx < 0) { audio.currentTime = 0; return; }
+            let startIdx = curIdx;
+            for (let i = curIdx - 1; i >= 0; i--) {
+                if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
+                startIdx = i;
+            }
+            if (chunks[startIdx].audioStart !== null) audio.currentTime = chunks[startIdx].audioStart;
+        });
     }
 
     // ================================================================
@@ -1221,6 +1257,7 @@
     // ================================================================
     const tooltipEl = $('tooltip');
     function showTooltip(element, chunk) {
+        const aud = document.getElementById('readerAudio'); if (aud && !aud.paused) aud.pause();
         if (activeChunkEl) activeChunkEl.classList.remove('tapped'); activeChunkEl = element; element.classList.add('tapped');
         const lang = $('langSelect').value; const translation = (chunk.translations && chunk.translations[lang]) || 'Translation not available'; const note = (chunk.notes && chunk.notes[lang]) || '';
         tooltipEl.innerHTML = `<div class="tooltip-content"><div class="tooltip-translation">${escapeHtml(translation)}</div>${note ? `<div class="tooltip-note">${escapeHtml(note)}</div>` : ''}</div>`; tooltipEl.classList.add('visible');
