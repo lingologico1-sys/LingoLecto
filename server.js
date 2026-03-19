@@ -354,6 +354,22 @@ app.get('/api/lectos', async (req, res) => {
     }
 });
 
+// ── Get a single lecto JSON ──────────────────────────────────────────────
+app.get('/api/lectos/:slug', async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const s3 = makeR2Client();
+        if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
+
+        const getRes = await s3.send(new GetObjectCommand({ Bucket: LECTO_BUCKET, Key: `json/${slug}.json` }));
+        const body = await getRes.Body.transformToString();
+        res.json(JSON.parse(body));
+    } catch (err) {
+        console.error('Get lecto error:', err);
+        res.status(404).json({ ok: false, error: err.message || 'Lecto not found' });
+    }
+});
+
 // ── Delete a lecto and all associated files ─────────────────────────────
 app.delete('/api/lectos/:slug', async (req, res) => {
     try {

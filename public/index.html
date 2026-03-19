@@ -1138,7 +1138,7 @@
 
     async function loadLecto(lecto) {
         try {
-            const res = await fetch(lecto.jsonUrl);
+            const res = await fetch('/api/lectos/' + encodeURIComponent(lecto.slug));
             if (!res.ok) throw new Error('Failed to fetch lecto JSON');
             const data = await res.json();
 
