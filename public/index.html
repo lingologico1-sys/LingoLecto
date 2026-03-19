@@ -1245,7 +1245,6 @@
                 if (t >= chunks[i].audioStart - 0.05) curIdx = i;
                 else break;
             }
-            console.log('[sentence-btn] t=', t, 'curIdx=', curIdx, 'chunks[0..2]:', chunks.slice(0,3).map(c=>({src:c.source,as:c.audioStart})));
             if (curIdx < 0) { audio.currentTime = 0; return; }
 
             // Find the index of the first chunk of the sentence containing fromIdx
@@ -1258,16 +1257,22 @@
                 return si;
             };
 
+            // Get the audioStart of the first chunk at/after idx that has a real timestamp
+            const firstValidTime = (idx) => {
+                for (let i = idx; i < chunks.length; i++) {
+                    if (chunks[i].audioStart !== null) return chunks[i].audioStart;
+                }
+                return 0;
+            };
+
             const sentenceStart = findSentenceStart(curIdx);
-            const sentenceStartTime = chunks[sentenceStart].audioStart;
+            const sentenceStartTime = firstValidTime(sentenceStart);
 
             // If already at/near the sentence start, jump to the previous sentence instead
-            if (sentenceStartTime !== null && t <= sentenceStartTime + 0.5 && sentenceStart > 0) {
-                const prevStart = findSentenceStart(sentenceStart - 1);
-                const prevTime = chunks[prevStart].audioStart;
-                audio.currentTime = prevTime !== null ? prevTime : 0;
+            if (t <= sentenceStartTime + 0.5 && sentenceStart > 0) {
+                audio.currentTime = firstValidTime(findSentenceStart(sentenceStart - 1));
             } else {
-                audio.currentTime = sentenceStartTime !== null ? sentenceStartTime : 0;
+                audio.currentTime = sentenceStartTime;
             }
         });
     }
