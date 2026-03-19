@@ -122,7 +122,8 @@
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
         .chunk:hover { background: var(--accent-glow); color: var(--accent); }
         .chunk.tapped { background: rgba(194,112,62,0.08); border-bottom: 2px solid var(--accent); padding-bottom: 0; }
-        .chunk.active-audio { color: #6b6b7b; transition: color 0.15s; }
+        .reader-text.audio-playing .chunk { color: #999; transition: color 0.15s; }
+        .reader-text.audio-playing .chunk.active-audio { color: var(--ink); transition: color 0.15s; }
 
         .reader-text.tiptap-rich img { max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; }
         .reader-text.tiptap-rich table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 16px; }
@@ -133,7 +134,8 @@
         .reader-text.tiptap-rich ul, .reader-text.tiptap-rich ol { padding-left: 24px; margin-bottom: 16px; }
         .reader-text.tiptap-rich .chunk { font: inherit; color: inherit; letter-spacing: inherit; }
         .reader-text.tiptap-rich .chunk:hover { background: var(--accent-glow); }
-        .reader-text.tiptap-rich .chunk.active-audio { color: #3a3a4a; }
+        .reader-text.tiptap-rich.audio-playing .chunk { color: #999; }
+        .reader-text.tiptap-rich.audio-playing .chunk.active-audio { color: var(--ink); }
 
         .stats-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--border); padding: 12px 32px; display: flex; align-items: center; justify-content: center; gap: 32px; font-size: 13px; color: var(--text-secondary); z-index: 100; }
         .stat-num { font-weight: 600; color: var(--ink); }
@@ -1222,7 +1224,8 @@
         const audio = document.getElementById('readerAudio'); if (!audio) return;
         const update = () => { const t = audio.currentTime; let aid = null; for (const c of state.readerData.chunks) { if (c.audioStart !== null && c.audioEnd !== null && t >= c.audioStart && t <= c.audioEnd + 0.1) { aid = c.id; break; } } if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; } };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
-        audio.addEventListener('play', () => { syncRAF = requestAnimationFrame(loop); }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); }); audio.addEventListener('seeked', update); audio.addEventListener('timeupdate', update);
+        const rt = $('reader-text');
+        audio.addEventListener('play', () => { rt.classList.add('audio-playing'); syncRAF = requestAnimationFrame(loop); }); audio.addEventListener('pause', () => { rt.classList.remove('audio-playing'); cancelAnimationFrame(syncRAF); update(); }); audio.addEventListener('ended', () => { rt.classList.remove('audio-playing'); }); audio.addEventListener('seeked', update); audio.addEventListener('timeupdate', update);
 
         const chunks = state.readerData.chunks;
 
