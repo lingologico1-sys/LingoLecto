@@ -203,16 +203,15 @@
             <div class="form-card">
                 <div class="form-card-label">French Text</div>
                 <div class="input-tabs">
-                    <button class="input-tab active" data-tab="plain">Plain Text</button>
+                    <button class="input-tab active" data-tab="lectos">Lectos</button>
                     <button class="input-tab" data-tab="editor">Rich Editor</button>
-                    <button class="input-tab" data-tab="tiptap">TipTap HTML</button>
+                    <button class="input-tab" data-tab="plain">Plain Text</button>
                     <button class="input-tab" data-tab="json">Paste JSON</button>
                 </div>
 
-                <div class="tab-panel active" id="panel-plain">
-                    <div class="field">
-                        <textarea id="plainTextInput" class="tall prose-input" placeholder="Collez votre texte français ici…"></textarea>
-                        <div class="field-hint">Sent to OpenAI for chunking, then ElevenLabs for audio.</div>
+                <div class="tab-panel active" id="panel-lectos">
+                    <div id="setup-lectos-list" style="min-height:80px;">
+                        <div style="font-size:12px; color:var(--text-secondary);">Loading...</div>
                     </div>
                 </div>
 
@@ -230,11 +229,10 @@
                     </details>
                 </div>
 
-                <div class="tab-panel" id="panel-tiptap">
+                <div class="tab-panel" id="panel-plain">
                     <div class="field">
-                        <div class="field-label"><span>TipTap JSON with HTML</span></div>
-                        <textarea id="tiptapInput" class="medium" placeholder='{"html": "<p>Votre texte...</p>"}'></textarea>
-                        <div class="field-hint">Must include an "html" field.</div>
+                        <textarea id="plainTextInput" class="tall prose-input" placeholder="Collez votre texte français ici…"></textarea>
+                        <div class="field-hint">Sent to OpenAI for chunking, then ElevenLabs for audio.</div>
                     </div>
                 </div>
 
@@ -520,7 +518,6 @@
             const s = {
                 activeTab: activeTab,
                 plainTextInput: $('plainTextInput').value,
-                tiptapInput: $('tiptapInput').value,
                 jsonInput: $('jsonInput').value,
                 jsonTiptapInput: $('jsonTiptapInput').value,
                 voiceId: $('voiceId').value,
@@ -548,7 +545,6 @@
                 $('panel-' + activeTab).classList.add('active');
             }
             if (s.plainTextInput) $('plainTextInput').value = s.plainTextInput;
-            if (s.tiptapInput) $('tiptapInput').value = s.tiptapInput;
             if (s.jsonInput) $('jsonInput').value = s.jsonInput;
             if (s.jsonTiptapInput) $('jsonTiptapInput').value = s.jsonTiptapInput;
             if (s.voiceId) $('voiceId').value = s.voiceId;
@@ -574,7 +570,6 @@
         localStorage.removeItem(FORM_STORAGE_KEY);
         localStorage.removeItem(STORAGE_KEY);
         $('plainTextInput').value = '';
-        $('tiptapInput').value = '';
         $('jsonInput').value = '';
         $('jsonTiptapInput').value = '';
         $('voiceId').value = 'JBFqnCBsd6RMkjVDRZzb';
@@ -587,10 +582,10 @@
         if (iframe && iframe.contentWindow) {
             iframe.contentWindow.postMessage({ type: 'set-content', json: { type: 'doc', content: [{ type: 'paragraph' }] } }, '*');
         }
-        activeTab = 'plain';
-        document.querySelectorAll('.input-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'plain'));
+        activeTab = 'lectos';
+        document.querySelectorAll('.input-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'lectos'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        $('panel-plain').classList.add('active');
+        $('panel-lectos').classList.add('active');
         $('btn-restore').style.display = 'none';
     }
 
@@ -639,7 +634,7 @@
     // ================================================================
     // TABS
     // ================================================================
-    let activeTab = 'plain';
+    let activeTab = 'lectos';
 
     document.querySelectorAll('.input-tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -648,6 +643,7 @@
             tab.classList.add('active');
             activeTab = tab.dataset.tab;
             $('panel-' + activeTab).classList.add('active');
+            if (activeTab === 'lectos') loadLectos();
             saveFormState();
         });
     });
@@ -664,7 +660,7 @@
     styleEl.addEventListener('input', () => { $('val-style').textContent = parseFloat(styleEl.value).toFixed(2); debouncedSave(); });
 
     // Save on text input changes
-    ['plainTextInput','tiptapInput','jsonInput','jsonTiptapInput','voiceId'].forEach(id => {
+    ['plainTextInput','jsonInput','jsonTiptapInput','voiceId'].forEach(id => {
         $(id).addEventListener('input', debouncedSave);
     });
     $('use_speaker_boost').addEventListener('change', saveFormState);
@@ -800,15 +796,9 @@
             sourceText = extractTextFromHtml(editorHtml);
             if (!sourceText.trim()) { setStatus('Could not extract text from editor content.', 'error'); return; }
 
-        } else if (activeTab === 'tiptap') {
-            const raw = $('tiptapInput').value.trim();
-            if (!raw) { setStatus('Please paste TipTap JSON.', 'error'); return; }
-            try {
-                tiptapData = JSON.parse(raw);
-                if (!tiptapData.html) throw new Error("Must include 'html' field.");
-                sourceText = extractTextFromHtml(tiptapData.html);
-                if (!sourceText.trim()) throw new Error("No text found in HTML.");
-            } catch (e) { setStatus('Invalid TipTap JSON: ' + e.message, 'error'); return; }
+        } else if (activeTab === 'lectos') {
+            setStatus('Switch to Rich Editor, Plain Text, or Paste JSON tab to generate.', 'error');
+            return;
 
         } else if (activeTab === 'json') {
             const raw = $('jsonInput').value.trim();
@@ -1113,33 +1103,36 @@
     // ================================================================
     // PAST LECTOS
     // ================================================================
+    let cachedLectos = null;
+
     async function loadLectos() {
-        const container = $('lectos-list');
-        container.innerHTML = '<div style="font-size:12px; color:var(--text-secondary);">Loading...</div>';
+        const containers = [$('setup-lectos-list'), $('lectos-list')].filter(Boolean);
+        containers.forEach(c => c.innerHTML = '<div style="font-size:12px; color:var(--text-secondary);">Loading...</div>');
         try {
             const res = await fetch('/api/lectos');
             const data = await res.json();
+            cachedLectos = data.ok ? data.lectos : [];
             if (!data.ok || !data.lectos.length) {
-                container.innerHTML = '<div style="font-size:12px; color:var(--text-secondary);">No published lectos found.</div>';
+                containers.forEach(c => c.innerHTML = '<div style="font-size:12px; color:var(--text-secondary);">No published lectos found.</div>');
                 return;
             }
-            container.innerHTML = '';
-            data.lectos.forEach(lecto => {
-                const item = document.createElement('div');
-                item.className = 'lecto-item';
-                const dateStr = lecto.date ? new Date(lecto.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-                item.innerHTML = `<div class="lecto-info"><div class="lecto-title">${escapeHtml(lecto.title)}</div><div class="lecto-date">${dateStr}</div></div><div class="lecto-delete"><button class="btn-sm" data-delete-slug="${lecto.slug}">Delete</button></div>`;
-                // Click to load
-                item.querySelector('.lecto-info').addEventListener('click', () => loadLecto(lecto));
-                // Delete
-                item.querySelector('[data-delete-slug]').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteLecto(lecto.slug, lecto.title);
+            containers.forEach(container => {
+                container.innerHTML = '';
+                data.lectos.forEach(lecto => {
+                    const item = document.createElement('div');
+                    item.className = 'lecto-item';
+                    const dateStr = lecto.date ? new Date(lecto.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                    item.innerHTML = `<div class="lecto-info"><div class="lecto-title">${escapeHtml(lecto.title)}</div><div class="lecto-date">${dateStr}</div></div><div class="lecto-delete"><button class="btn-sm" data-delete-slug="${lecto.slug}">Delete</button></div>`;
+                    item.querySelector('.lecto-info').addEventListener('click', () => loadLecto(lecto));
+                    item.querySelector('[data-delete-slug]').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteLecto(lecto.slug, lecto.title);
+                    });
+                    container.appendChild(item);
                 });
-                container.appendChild(item);
             });
         } catch (e) {
-            container.innerHTML = '<div style="font-size:12px; color:var(--error);">Failed to load lectos: ' + e.message + '</div>';
+            containers.forEach(c => c.innerHTML = '<div style="font-size:12px; color:var(--error);">Failed to load lectos: ' + e.message + '</div>');
         }
     }
 
@@ -1159,12 +1152,8 @@
             state.tapCount = 0;
             saveState();
 
-            // Switch to reader tab
-            document.querySelectorAll('.reader-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.reader-panel').forEach(p => p.classList.remove('active'));
-            document.querySelector('[data-rtab="reader"]').classList.add('active');
-            $('rpanel-reader').classList.add('active');
-            renderReader();
+            // Switch to reader view
+            showReaderView();
         } catch (e) {
             alert('Failed to load lecto: ' + e.message);
         }
@@ -1527,6 +1516,7 @@ document.getElementById('editor').addEventListener('scroll',function(){if(rsWrap
     // INIT
     // ================================================================
     initEditorIframe();
+    loadLectos();
     </script>
 </body>
 </html>
