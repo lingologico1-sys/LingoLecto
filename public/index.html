@@ -1245,6 +1245,7 @@
                 if (t >= chunks[i].audioStart - 0.05) curIdx = i;
                 else break;
             }
+            console.log('[sentence-btn] t=', t, 'curIdx=', curIdx, 'chunks[0..2]:', chunks.slice(0,3).map(c=>({src:c.source,as:c.audioStart})));
             if (curIdx < 0) { audio.currentTime = 0; return; }
 
             // Find the index of the first chunk of the sentence containing fromIdx
