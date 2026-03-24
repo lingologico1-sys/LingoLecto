@@ -73,10 +73,7 @@ app.post('/api/upload-image', async (req, res) => {
             Body: body
         }));
 
-        const optimizedFormats = ['image/avif', 'image/webp', 'image/svg+xml', 'image/gif'];
-        const publicUrl = optimizedFormats.includes(fileType)
-            ? `${LECTO_DOMAIN}/${key}`
-            : `${LECTO_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
+        const publicUrl = `${LECTO_DOMAIN}/${key}`;
 
         console.log('Upload success:', publicUrl);
         res.json({ ok: true, publicUrl });
@@ -111,10 +108,7 @@ app.post('/api/upload-url', async (req, res) => {
 
         const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
 
-        const optimizedFormats = ['image/avif', 'image/webp', 'image/svg+xml', 'image/gif'];
-        const publicUrl = optimizedFormats.includes(fileType)
-            ? `${LECTO_DOMAIN}/${key}`
-            : `${LECTO_DOMAIN}/cdn-cgi/image/format=auto/${key}`;
+        const publicUrl = `${LECTO_DOMAIN}/${key}`;
 
         res.json({ ok: true, uploadUrl, publicUrl });
 
