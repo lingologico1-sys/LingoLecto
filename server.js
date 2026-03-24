@@ -193,7 +193,8 @@ app.post('/api/chunk', (req, res) => {
                 return;
             }
 
-            chunkJobs.set(jobId, { status: 'done', result: readerJson });
+            const usage = data.usage || null;
+            chunkJobs.set(jobId, { status: 'done', result: readerJson, usage });
         } catch (err) {
             console.error('Chunk error:', err);
             chunkJobs.set(jobId, { status: 'error', error: err.message || 'Internal server error' });
@@ -220,8 +221,9 @@ app.get('/api/chunk/:jobId', (req, res) => {
     }
     // done
     const result = job.result;
+    const usage = job.usage || null;
     chunkJobs.delete(req.params.jobId);
-    res.json({ status: 'done', result });
+    res.json({ status: 'done', result, usage });
 });
 
 // ── Publish: upload audio + images + consolidated JSON to lecto bucket ──

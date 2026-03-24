@@ -849,6 +849,11 @@
                             const data = await pollRes.json();
                             if (data.status === 'processing') { setTimeout(poll, 2000); return; }
                             if (data.status === 'error') { reject(new Error(data.error || 'Chunking failed')); return; }
+                            if (data.usage) {
+                                const u = data.usage;
+                                console.log('OpenAI usage:', u);
+                                setStatus(`Chunking done — ${u.input_tokens?.toLocaleString() || '?'} input / ${u.output_tokens?.toLocaleString() || '?'} output tokens`, 'success');
+                            }
                             resolve(data.result);
                         } catch (e) { reject(e); }
                     };
@@ -867,6 +872,8 @@
             if (!audioRes.ok) { const err = await audioRes.json().catch(() => ({ error: `HTTP ${audioRes.status}` })); throw new Error(err.error || `ElevenLabs failed: ${audioRes.status}`); }
             const audioData = await audioRes.json();
             stopPipelineTimer();
+            const charCount = sourceText.length;
+            setStatus(`Audio done — ${charCount.toLocaleString()} characters sent to ElevenLabs`, 'success');
 
             setProgress('done');
             resetPipelineUI();
@@ -1054,7 +1061,7 @@
             $('use_speaker_boost').checked = $('data-speaker-boost').checked;
             saveFormState();
 
-            status.textContent = 'Audio regenerated successfully!';
+            status.textContent = `Audio regenerated — ${sourceText.length.toLocaleString()} characters sent to ElevenLabs`;
             // Update audio JSON display
             $('data-audio-json').value = state.alignmentData ? JSON.stringify(state.alignmentData, null, 2) : '';
 
