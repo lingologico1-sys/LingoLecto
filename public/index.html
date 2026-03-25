@@ -1279,7 +1279,18 @@
             }
         };
 
-        const update = () => { const t = audio.currentTime; let aid = null; for (const c of state.readerData.chunks) { if (c.audioStart !== null && c.audioEnd !== null && t >= c.audioStart && t <= c.audioEnd + 0.1) { aid = c.id; break; } } if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); } };
+        const update = () => {
+            const t = audio.currentTime; let aid = null; let fallback = null;
+            for (const c of state.readerData.chunks) {
+                if (c.audioStart === null || c.audioEnd === null) continue;
+                // Exact match takes priority
+                if (t >= c.audioStart && t <= c.audioEnd) { aid = c.id; break; }
+                // Fallback: small tolerance after audioEnd to bridge gaps (but only if no exact match found)
+                if (!fallback && t >= c.audioStart && t <= c.audioEnd + 0.1) fallback = c.id;
+            }
+            if (!aid) aid = fallback;
+            if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); }
+        };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
         audio.addEventListener('play', () => {
             autoScroll = true;
