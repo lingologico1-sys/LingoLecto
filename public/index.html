@@ -1256,7 +1256,13 @@
         const audio = document.getElementById('readerAudio'); if (!audio) return;
         const update = () => { const t = audio.currentTime; let aid = null; for (const c of state.readerData.chunks) { if (c.audioStart !== null && c.audioEnd !== null && t >= c.audioStart && t <= c.audioEnd + 0.1) { aid = c.id; break; } } if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; } };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
-        audio.addEventListener('play', () => { if (tapResumeTime !== null) { safeSeek(tapResumeTime); tapResumeTime = null; } hideTooltip(); audio.blur(); syncRAF = requestAnimationFrame(loop); }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); audio.blur(); }); audio.addEventListener('seeked', () => { update(); audio.blur(); }); audio.addEventListener('timeupdate', update);
+        audio.addEventListener('play', () => {
+            if (tapResumeTime !== null) {
+                const t = tapResumeTime; tapResumeTime = null;
+                audio.currentTime = t;
+            }
+            hideTooltip(); audio.blur(); syncRAF = requestAnimationFrame(loop);
+        }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); audio.blur(); }); audio.addEventListener('seeked', () => { update(); audio.blur(); }); audio.addEventListener('timeupdate', update);
 
         const chunks = state.readerData.chunks;
 
@@ -1329,11 +1335,7 @@
                 case 'Space':
                 case 'ArrowDown':
                     e.preventDefault();
-                    if (audio.paused) {
-                        if (tapResumeTime !== null) { safeSeek(tapResumeTime); tapResumeTime = null; }
-                        hideTooltip();
-                        audio.play();
-                    } else { audio.pause(); }
+                    audio.paused ? audio.play() : audio.pause();
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
