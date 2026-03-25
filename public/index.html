@@ -1254,15 +1254,41 @@
 
     function setupAudioSync() {
         const audio = document.getElementById('readerAudio'); if (!audio) return;
-        const update = () => { const t = audio.currentTime; let aid = null; for (const c of state.readerData.chunks) { if (c.audioStart !== null && c.audioEnd !== null && t >= c.audioStart && t <= c.audioEnd + 0.1) { aid = c.id; break; } } if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; } };
+
+        // --- Auto-scroll state ---
+        let autoScroll = true;
+        let programmaticScroll = false;
+        const scrollThreshold = 0.70; // scroll when chunk passes 70% of viewport height
+
+        // Pause auto-scroll on manual scroll, re-enable on play/seek
+        const onUserScroll = () => { if (!programmaticScroll) autoScroll = false; };
+        window.addEventListener('scroll', onUserScroll, { passive: true });
+        audio.addEventListener('emptied', () => window.removeEventListener('scroll', onUserScroll));
+
+        const scrollToChunk = (chunkId) => {
+            if (!autoScroll || !chunkId) return;
+            const el = document.querySelector(`.chunk[data-id="${chunkId}"]`);
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const vh = window.innerHeight;
+            // Only scroll if the chunk is below the threshold or above the viewport
+            if (rect.top > vh * scrollThreshold || rect.bottom < 0) {
+                programmaticScroll = true;
+                window.scrollTo({ top: window.scrollY + rect.top - vh * 0.35, behavior: 'smooth' });
+                setTimeout(() => { programmaticScroll = false; }, 500);
+            }
+        };
+
+        const update = () => { const t = audio.currentTime; let aid = null; for (const c of state.readerData.chunks) { if (c.audioStart !== null && c.audioEnd !== null && t >= c.audioStart && t <= c.audioEnd + 0.1) { aid = c.id; break; } } if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); } };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
         audio.addEventListener('play', () => {
+            autoScroll = true;
             if (tapResumeTime !== null) {
                 const t = tapResumeTime; tapResumeTime = null;
                 audio.currentTime = t;
             }
             hideTooltip(); audio.blur(); syncRAF = requestAnimationFrame(loop);
-        }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); audio.blur(); }); audio.addEventListener('seeked', () => { update(); audio.blur(); }); audio.addEventListener('timeupdate', update);
+        }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); audio.blur(); }); audio.addEventListener('seeked', () => { autoScroll = true; update(); audio.blur(); }); audio.addEventListener('timeupdate', update);
 
         const chunks = state.readerData.chunks;
 
