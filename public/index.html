@@ -1354,10 +1354,25 @@
             // If no next sentence, do nothing (already at end)
         };
 
-        const findIdxById = (id) => { if (!id) return -1; return chunks.findIndex(c => c.id === id); };
+        // Precise chunk index for navigation — no tolerance on audioEnd to avoid
+        // matching the next chunk prematurely near boundaries.
+        const findNavIdx = () => {
+            const t = audio.currentTime;
+            // Exact range match (tiny tolerance on start for seek imprecision)
+            for (let i = 0; i < chunks.length; i++) {
+                const c = chunks[i];
+                if (c.audioStart !== null && c.audioEnd !== null &&
+                    t >= c.audioStart - 0.02 && t <= c.audioEnd) return i;
+            }
+            // In a gap: return last chunk whose audioEnd is before current time
+            let last = -1;
+            for (let i = 0; i < chunks.length; i++) {
+                if (chunks[i].audioEnd !== null && t > chunks[i].audioEnd) last = i;
+            }
+            return last;
+        };
         const seekPrevChunk = () => {
-            let curIdx = findIdxById(currentAudioChunkId);
-            if (curIdx < 0) curIdx = findCurrentIdx();
+            const curIdx = findNavIdx();
             if (curIdx <= 0) { audio.currentTime = 0; return; }
             for (let i = curIdx - 1; i >= 0; i--) {
                 if (chunks[i].audioStart !== null) { safeSeek(chunks[i].audioStart); return; }
@@ -1365,8 +1380,7 @@
             audio.currentTime = 0;
         };
         const seekNextChunk = () => {
-            let curIdx = findIdxById(currentAudioChunkId);
-            if (curIdx < 0) curIdx = findCurrentIdx();
+            const curIdx = findNavIdx();
             const startFrom = curIdx < 0 ? 0 : curIdx + 1;
             for (let i = startFrom; i < chunks.length; i++) {
                 if (chunks[i].audioStart !== null) { safeSeek(chunks[i].audioStart); return; }
