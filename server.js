@@ -27,6 +27,14 @@ const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
 const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
 const LECTO_BUCKET = 'lecto';
 const LECTO_DOMAIN = 'https://lecto.lingomondo.app';
+const APP_PASSWORD = process.env.APP_PASSWORD || 'lingologico';
+
+// ── Auth middleware (protects creation/generation endpoints) ─────────────
+function requireAuth(req, res, next) {
+    const token = req.headers['x-auth-token'];
+    if (token === APP_PASSWORD) return next();
+    res.status(401).json({ error: 'Unauthorized — invalid or missing password' });
+}
 
 // ── R2 Client ────────────────────────────────────────────────────────────
 function makeR2Client() {
@@ -50,7 +58,7 @@ function makeR2Client() {
 }
 
 // ── R2 Image Upload: server-side proxy (avoids browser CORS on presigned URLs) ──
-app.post('/api/upload-image', async (req, res) => {
+app.post('/api/upload-image', requireAuth, async (req, res) => {
     try {
         // Read raw body manually (no body-parser middleware)
         const chunks = [];
@@ -92,7 +100,7 @@ app.post('/api/upload-image', async (req, res) => {
 });
 
 // ── R2 Image Upload: get pre-signed URL ──────────────────────────────────
-app.post('/api/upload-url', async (req, res) => {
+app.post('/api/upload-url', requireAuth, async (req, res) => {
     try {
         const { fileName, fileType } = req.body;
 
@@ -129,7 +137,7 @@ app.post('/api/upload-url', async (req, res) => {
 // ── OpenAI: chunk French text via stored prompt (async polling) ──────────
 const chunkJobs = new Map();
 
-app.post('/api/chunk', (req, res) => {
+app.post('/api/chunk', requireAuth, (req, res) => {
     const { sourceText } = req.body;
 
     if (!sourceText || !sourceText.trim()) {
@@ -237,7 +245,7 @@ app.get('/api/chunk/:jobId', (req, res) => {
 });
 
 // ── Publish: upload audio + images + consolidated JSON to lecto bucket ──
-app.post('/api/publish', async (req, res) => {
+app.post('/api/publish', requireAuth, async (req, res) => {
     try {
         const { title, readerData, tiptapData, alignmentData, audioBase64 } = req.body;
 
@@ -410,7 +418,7 @@ app.get('/api/lectos/:slug/audio', async (req, res) => {
 });
 
 // ── Delete a lecto and all associated files ─────────────────────────────
-app.delete('/api/lectos/:slug', async (req, res) => {
+app.delete('/api/lectos/:slug', requireAuth, async (req, res) => {
     try {
         const { slug } = req.params;
         const s3 = makeR2Client();
@@ -461,7 +469,7 @@ app.delete('/api/lectos/:slug', async (req, res) => {
 });
 
 // ── ElevenLabs: generate audio with timestamps ──────────────────────────
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', requireAuth, async (req, res) => {
     try {
         const { voiceId, text, stability, similarity_boost, style, use_speaker_boost } = req.body;
 

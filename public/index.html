@@ -283,6 +283,10 @@
                 </div>
             </div>
 
+            <div class="field-group" style="margin-bottom:12px;">
+                <label class="field-label" for="auth-password">Password</label>
+                <input type="password" id="auth-password" placeholder="Enter password to generate" style="width:200px;">
+            </div>
             <button class="btn btn-primary" id="btn-generate">Generate & Open Reader</button>
             <button class="btn btn-secondary" id="btn-restore" style="display:none;">Restore Previous Session</button>
 
@@ -467,6 +471,18 @@
     let editorHtml = '';
 
     const $ = id => document.getElementById(id);
+
+    // ================================================================
+    // AUTH
+    // ================================================================
+    function getAuthToken() { return localStorage.getItem('lecto_auth') || ''; }
+    function setAuthToken(t) { localStorage.setItem('lecto_auth', t); }
+    function authHeaders(extra) { return Object.assign({ 'x-auth-token': getAuthToken() }, extra || {}); }
+    function authedFetch(url, opts) {
+        opts = opts || {};
+        opts.headers = authHeaders(opts.headers || {});
+        return fetch(url, opts);
+    }
 
     // ================================================================
     // PERSISTENCE
@@ -678,6 +694,7 @@
 
     // Restore saved form state on load
     loadFormState();
+    if (getAuthToken()) $('auth-password').value = getAuthToken();
 
     if (localStorage.getItem(STORAGE_KEY)) $('btn-restore').style.display = '';
 
@@ -829,6 +846,10 @@
         const voiceId = $('voiceId').value.trim();
         if (!voiceId) { setStatus('Voice ID is required.', 'error'); return; }
 
+        const pw = $('auth-password').value.trim();
+        if (!pw) { setStatus('Password is required.', 'error'); return; }
+        setAuthToken(pw);
+
         $('btn-generate').disabled = true;
 
         try {
@@ -838,7 +859,7 @@
                 startPipelineTimer('chunk');
 
                 // Start async job
-                const startRes = await fetch('/api/chunk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceText }) });
+                const startRes = await authedFetch('/api/chunk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceText }) });
                 if (!startRes.ok) { const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` })); throw new Error(err.error || `Chunk start failed: ${startRes.status}`); }
                 const { jobId } = await startRes.json();
 
@@ -874,7 +895,7 @@
             setStatus('Generating audio with ElevenLabs…', 'loading');
             setProgress('audio');
             startPipelineTimer('audio');
-            const audioRes = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voiceId, text: sourceText, stability: parseFloat(stabilityEl.value), similarity_boost: parseFloat(similarityEl.value), style: parseFloat(styleEl.value), use_speaker_boost: $('use_speaker_boost').checked }) });
+            const audioRes = await authedFetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voiceId, text: sourceText, stability: parseFloat(stabilityEl.value), similarity_boost: parseFloat(similarityEl.value), style: parseFloat(styleEl.value), use_speaker_boost: $('use_speaker_boost').checked }) });
             if (!audioRes.ok) { const err = await audioRes.json().catch(() => ({ error: `HTTP ${audioRes.status}` })); throw new Error(err.error || `ElevenLabs failed: ${audioRes.status}`); }
             const audioData = await audioRes.json();
             stopPipelineTimer();
@@ -1039,7 +1060,7 @@
         status.textContent = 'Generating audio with ElevenLabs...';
 
         try {
-            const audioRes = await fetch('/api/generate', {
+            const audioRes = await authedFetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1092,7 +1113,7 @@
         $('publish-result').style.display = 'none';
 
         try {
-            const res = await fetch('/api/publish', {
+            const res = await authedFetch('/api/publish', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1184,7 +1205,7 @@
     async function deleteLecto(slug, title) {
         if (!confirm(`Delete "${title}" and all associated files?`)) return;
         try {
-            const res = await fetch('/api/lectos/' + encodeURIComponent(slug), { method: 'DELETE' });
+            const res = await authedFetch('/api/lectos/' + encodeURIComponent(slug), { method: 'DELETE' });
             const data = await res.json();
             if (!data.ok) throw new Error(data.error || 'Delete failed');
             loadLectos();
@@ -1518,7 +1539,7 @@ pendingUploads[id]=true;
 if(preview){const attrs={src:preview,'data-upload-id':id};try{const{state:s}=editor;const n=s.schema.nodes.image.create(attrs);editor.view.dispatch(s.tr.insert(pos,n))}catch(e){editor.chain().focus().setImage(attrs).run()}
 createOverlay(id)}
 try{
-const res=await fetch('${location.origin}/api/upload-image',{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':file.name},body:file});
+const res=await fetch('${location.origin}/api/upload-image',{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':file.name,'x-auth-token':'${getAuthToken()}'},body:file});
 const data=await res.json();
 delete pendingUploads[id];removeOverlay(id);
 if(data.ok)replacePlaceholder(id,data.publicUrl);else{removePlaceholder(id);alert('Upload failed: '+(data.error||'Unknown'));}
