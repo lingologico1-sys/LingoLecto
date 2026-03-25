@@ -912,7 +912,7 @@
 
         const ac = $('audio-container');
         const audioSrc = state.audioUrl || (state.audioBase64 ? 'data:audio/mpeg;base64,' + state.audioBase64 : null);
-        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div><div class="kbd-legend"><span><kbd>Space</kbd> / <kbd>↓</kbd> Play/Pause</span><span><kbd>←</kbd> Prev Sentence</span><span><kbd>→</kbd> Next Sentence</span><span><kbd>↑</kbd> Rewind</span></div>` : '';
+        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div><div class="kbd-legend"><span><kbd>Space</kbd> / <kbd>↓</kbd> Play/Pause</span><span><kbd>←</kbd> Prev Sentence</span><span><kbd>→</kbd> Next Sentence</span><span><kbd>↑</kbd> Show Translation</span></div>` : '';
 
         const rt = $('reader-text');
         const useTiptap = state.tiptapData && state.tiptapData.html;
@@ -1324,7 +1324,11 @@
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    audio.currentTime = 0;
+                    if (currentAudioChunkId) {
+                        const chunk = chunkMap.get(currentAudioChunkId);
+                        const el = document.querySelector(`.chunk[data-id="${currentAudioChunkId}"]`);
+                        if (chunk && el) showTooltip(el, chunk);
+                    }
                     break;
             }
         };
