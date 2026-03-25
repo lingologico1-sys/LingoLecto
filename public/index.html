@@ -1337,34 +1337,35 @@
                 case 'ArrowLeft':
                     e.preventDefault();
                     if (!audio.paused) audio.pause();
-                    { // Find previous valid chunk
-                        const curPos = validIndices.indexOf(navIdx);
-                        if (curPos > 0) {
-                            navIdx = validIndices[curPos - 1];
-                        } else if (curPos === 0) {
-                            navIdx = validIndices[0];
-                        } else {
-                            // navIdx not in valid list; find nearest valid before current time
-                            navIdx = validIndices.length > 0 ? validIndices[0] : -1;
+                    {
+                        let curPos = validIndices.indexOf(navIdx);
+                        // If navIdx not in validIndices, find nearest valid at or before navIdx
+                        if (curPos < 0) {
+                            for (let i = validIndices.length - 1; i >= 0; i--) {
+                                if (validIndices[i] <= navIdx) { curPos = i; break; }
+                            }
                         }
-                        if (navIdx >= 0 && chunks[navIdx].audioStart !== null) {
-                            audio.currentTime = chunks[navIdx].audioStart;
-                        }
+                        const newPos = curPos > 0 ? curPos - 1 : 0;
+                        navIdx = validIndices[newPos];
+                        audio.currentTime = chunks[navIdx].audioStart;
                     }
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
                     if (!audio.paused) audio.pause();
-                    { // Find next valid chunk
-                        const curPos = validIndices.indexOf(navIdx);
-                        if (curPos >= 0 && curPos < validIndices.length - 1) {
-                            navIdx = validIndices[curPos + 1];
-                        } else if (curPos < 0) {
-                            // Not on any chunk yet; go to first
-                            navIdx = validIndices.length > 0 ? validIndices[0] : -1;
+                    {
+                        let curPos = validIndices.indexOf(navIdx);
+                        // If navIdx not in validIndices, find nearest valid at or before navIdx
+                        if (curPos < 0) {
+                            for (let i = validIndices.length - 1; i >= 0; i--) {
+                                if (validIndices[i] <= navIdx) { curPos = i; break; }
+                            }
+                            // If still -1, start from beginning
+                            if (curPos < 0) curPos = -1;
                         }
-                        // If already at last chunk, do nothing
-                        if (navIdx >= 0 && chunks[navIdx].audioStart !== null) {
+                        const newPos = curPos + 1;
+                        if (newPos < validIndices.length) {
+                            navIdx = validIndices[newPos];
                             audio.currentTime = chunks[navIdx].audioStart;
                         }
                     }
@@ -1418,8 +1419,14 @@
     // ================================================================
     const tooltipEl = $('tooltip');
     function showTooltip(element, chunk) {
-        const aud = document.getElementById('readerAudio'); if (aud && !aud.paused) aud.pause();
-        if (chunk.audioStart !== null && chunk.audioStart !== undefined) tapResumeTime = chunk.audioStart;
+        const aud = document.getElementById('readerAudio');
+        if (aud) {
+            if (!aud.paused) aud.pause();
+            if (chunk.audioStart !== null && chunk.audioStart !== undefined) {
+                aud.currentTime = chunk.audioStart;
+                tapResumeTime = null; // no deferred seek needed, we set it directly
+            }
+        }
         // Clear active-audio highlight from previous chunk
         if (currentAudioChunkId) { document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); currentAudioChunkId = null; }
         if (activeChunkEl) activeChunkEl.classList.remove('tapped'); activeChunkEl = element; element.classList.add('tapped');
