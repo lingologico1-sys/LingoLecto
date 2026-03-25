@@ -846,6 +846,11 @@
                     const poll = async () => {
                         try {
                             const pollRes = await fetch('/api/chunk/' + jobId);
+                            if (!pollRes.ok) {
+                                let errMsg = `Chunk poll failed: HTTP ${pollRes.status}`;
+                                try { const errData = await pollRes.json(); errMsg = errData.error || errMsg; } catch(_) { try { errMsg += ' - ' + await pollRes.text(); } catch(_2){} }
+                                reject(new Error(errMsg)); return;
+                            }
                             const data = await pollRes.json();
                             if (data.status === 'processing') { setTimeout(poll, 2000); return; }
                             if (data.status === 'error') { reject(new Error(data.error || 'Chunking failed')); return; }
@@ -855,7 +860,7 @@
                                 setStatus(`Chunking done — ${u.input_tokens?.toLocaleString() || '?'} input / ${u.output_tokens?.toLocaleString() || '?'} output tokens`, 'success');
                             }
                             resolve(data.result);
-                        } catch (e) { reject(e); }
+                        } catch (e) { reject(new Error('Chunk poll error: ' + (e.message || e))); }
                     };
                     poll();
                 });
