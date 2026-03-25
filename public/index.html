@@ -459,6 +459,7 @@
     let chunkMap = new Map();
     let activeChunkEl = null;
     let currentAudioChunkId = null;
+    let tapResumeTime = null; // when a chunk is tapped, store its audioStart so play resumes there
     let syncRAF = null;
 
     // Editor state
@@ -1234,7 +1235,7 @@
         const audio = document.getElementById('readerAudio'); if (!audio) return;
         const update = () => { const t = audio.currentTime; let aid = null; for (const c of state.readerData.chunks) { if (c.audioStart !== null && c.audioEnd !== null && t >= c.audioStart && t <= c.audioEnd + 0.1) { aid = c.id; break; } } if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; } };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
-        audio.addEventListener('play', () => { syncRAF = requestAnimationFrame(loop); }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); }); audio.addEventListener('seeked', update); audio.addEventListener('timeupdate', update);
+        audio.addEventListener('play', () => { if (tapResumeTime !== null) { safeSeek(tapResumeTime); tapResumeTime = null; } hideTooltip(); syncRAF = requestAnimationFrame(loop); }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); }); audio.addEventListener('seeked', update); audio.addEventListener('timeupdate', update);
 
         const chunks = state.readerData.chunks;
 
@@ -1307,7 +1308,11 @@
                 case 'Space':
                 case 'ArrowDown':
                     e.preventDefault();
-                    audio.paused ? audio.play() : audio.pause();
+                    if (audio.paused) {
+                        if (tapResumeTime !== null) { safeSeek(tapResumeTime); tapResumeTime = null; }
+                        hideTooltip();
+                        audio.play();
+                    } else { audio.pause(); }
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
@@ -1341,6 +1346,7 @@
     const tooltipEl = $('tooltip');
     function showTooltip(element, chunk) {
         const aud = document.getElementById('readerAudio'); if (aud && !aud.paused) aud.pause();
+        if (chunk.audioStart !== null && chunk.audioStart !== undefined) tapResumeTime = chunk.audioStart;
         if (activeChunkEl) activeChunkEl.classList.remove('tapped'); activeChunkEl = element; element.classList.add('tapped');
         const lang = $('langSelect').value; const translation = (chunk.translations && chunk.translations[lang]) || 'Translation not available'; const note = (chunk.notes && chunk.notes[lang]) || '';
         tooltipEl.innerHTML = `<div class="tooltip-content"><div class="tooltip-translation">${escapeHtml(translation)}</div>${note ? `<div class="tooltip-note">${escapeHtml(note)}</div>` : ''}</div>`; tooltipEl.classList.add('visible');
@@ -1349,7 +1355,7 @@
         tooltipEl.style.top = `${top}px`; tooltipEl.style.left = `${left}px`;
         if (!state.tappedIds.has(chunk.id)) { state.tapCount++; state.tappedIds.add(chunk.id); $('tapCount').textContent = state.tapCount; $('uniqueCount').textContent = state.tappedIds.size; saveState(); }
     }
-    function hideTooltip() { tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } }
+    function hideTooltip() { tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } tapResumeTime = null; }
     document.addEventListener('click', (e) => { if (tooltipEl.classList.contains('visible') && !e.target.closest('.chunk') && !e.target.closest('.tooltip')) hideTooltip(); });
     window.addEventListener('scroll', hideTooltip, { passive: true });
     window.addEventListener('resize', hideTooltip, { passive: true });
