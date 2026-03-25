@@ -2,6 +2,14 @@ const express = require('express');
 const path = require('path');
 const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { Agent } = require('undici');
+
+// Custom undici agent with extended timeouts for long-running API calls (OpenAI can take 5+ minutes)
+const longTimeoutAgent = new Agent({
+    headersTimeout: 600000,   // 10 minutes
+    bodyTimeout: 600000,
+    connectTimeout: 30000
+});
 
 const app = express();
 // JSON body parser — skip for /api/upload-image (raw binary)
@@ -143,7 +151,8 @@ app.post('/api/chunk', (req, res) => {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + OPENAI_API_KEY
                 },
-                signal: AbortSignal.timeout(480000),
+                signal: AbortSignal.timeout(600000),
+                dispatcher: longTimeoutAgent,
                 body: JSON.stringify({
                     model: 'gpt-5.4',
                     prompt: {
@@ -197,7 +206,8 @@ app.post('/api/chunk', (req, res) => {
             chunkJobs.set(jobId, { status: 'done', result: readerJson, usage });
         } catch (err) {
             console.error('Chunk error:', err);
-            chunkJobs.set(jobId, { status: 'error', error: err.message || 'Internal server error' });
+            const cause = err.cause ? ` (${err.cause.code || err.cause.message || ''})` : '';
+            chunkJobs.set(jobId, { status: 'error', error: (err.message || 'Internal server error') + cause });
         }
 
         // Clean up job after 5 minutes
