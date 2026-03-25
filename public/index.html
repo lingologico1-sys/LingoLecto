@@ -1289,112 +1289,33 @@
                 if (!fallback && t >= c.audioStart && t <= c.audioEnd + 0.1) fallback = c.id;
             }
             if (!aid) aid = fallback;
-            if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); }
+            if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); syncNavIdx(); }
         };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
         audio.addEventListener('play', () => {
             autoScroll = true;
             if (tapResumeTime !== null) {
-                const t = tapResumeTime; tapResumeTime = null;
-                audio.currentTime = t;
+                audio.currentTime = tapResumeTime; tapResumeTime = null;
             }
             hideTooltip(); audio.blur(); syncRAF = requestAnimationFrame(loop);
-        }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); update(); audio.blur(); }); audio.addEventListener('seeked', () => { autoScroll = true; update(); audio.blur(); }); audio.addEventListener('timeupdate', update);
+        }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); audio.blur(); }); audio.addEventListener('seeked', () => { autoScroll = true; audio.blur(); }); audio.addEventListener('timeupdate', update);
 
         const chunks = state.readerData.chunks;
 
-        // --- Sentence navigation helpers ---
-        const findCurrentIdx = () => {
-            const t = audio.currentTime;
-            let curIdx = -1;
-            for (let i = 0; i < chunks.length; i++) {
-                if (chunks[i].audioStart === null) continue;
-                if (t >= chunks[i].audioStart - 0.05) curIdx = i;
-                else break;
-            }
-            return curIdx;
-        };
-        const findSentenceStart = (fromIdx) => {
-            let si = fromIdx;
-            for (let i = fromIdx - 1; i >= 0; i--) {
-                if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
-                si = i;
-            }
-            return si;
-        };
-        const firstValidTime = (idx) => {
-            for (let i = idx; i < chunks.length; i++) {
-                if (chunks[i].audioStart !== null) return chunks[i].audioStart;
-            }
-            return 0;
-        };
-        const safeSeek = (seekTo) => {
-            if (audio.readyState >= 1 && isFinite(audio.duration)) {
-                audio.currentTime = seekTo;
-            } else {
-                audio.addEventListener('loadedmetadata', function onMeta() {
-                    audio.removeEventListener('loadedmetadata', onMeta);
-                    audio.currentTime = seekTo;
-                });
-                audio.load();
-            }
-        };
-        const seekPrevSentence = () => {
-            const curIdx = findCurrentIdx();
-            if (curIdx < 0) { audio.currentTime = 0; return; }
-            const sentenceStart = findSentenceStart(curIdx);
-            let seekTo;
-            if (curIdx <= sentenceStart && sentenceStart > 0) {
-                seekTo = firstValidTime(findSentenceStart(sentenceStart - 1));
-            } else {
-                seekTo = firstValidTime(sentenceStart);
-            }
-            safeSeek(seekTo);
-        };
-        const seekNextSentence = () => {
-            const curIdx = findCurrentIdx();
-            if (curIdx < 0) { safeSeek(firstValidTime(0)); return; }
-            // Find end of current sentence, then start of next
-            let i = curIdx;
-            while (i < chunks.length && !/[.!?]$/.test(chunks[i].source.trimEnd())) i++;
-            // i is now the last chunk of the current sentence (with punctuation), move to next
-            const nextIdx = i + 1;
-            if (nextIdx < chunks.length) {
-                safeSeek(firstValidTime(nextIdx));
-            }
-            // If no next sentence, do nothing (already at end)
-        };
+        // --- Navigation index: explicitly tracks which chunk we're on ---
+        let navIdx = -1;
 
-        // Precise chunk index for navigation — no tolerance on audioEnd to avoid
-        // matching the next chunk prematurely near boundaries.
-        const findNavIdx = () => {
-            const t = audio.currentTime;
-            // Exact range match (tiny tolerance on start for seek imprecision)
-            for (let i = 0; i < chunks.length; i++) {
-                const c = chunks[i];
-                if (c.audioStart !== null && c.audioEnd !== null &&
-                    t >= c.audioStart - 0.02 && t <= c.audioEnd) return i;
-            }
-            // In a gap: return last chunk whose audioEnd is before current time
-            let last = -1;
-            for (let i = 0; i < chunks.length; i++) {
-                if (chunks[i].audioEnd !== null && t > chunks[i].audioEnd) last = i;
-            }
-            return last;
-        };
-        const seekPrevChunk = () => {
-            const curIdx = findNavIdx();
-            if (curIdx <= 0) { audio.currentTime = 0; return; }
-            for (let i = curIdx - 1; i >= 0; i--) {
-                if (chunks[i].audioStart !== null) { safeSeek(chunks[i].audioStart); return; }
-            }
-            audio.currentTime = 0;
-        };
-        const seekNextChunk = () => {
-            const curIdx = findNavIdx();
-            const startFrom = curIdx < 0 ? 0 : curIdx + 1;
-            for (let i = startFrom; i < chunks.length; i++) {
-                if (chunks[i].audioStart !== null) { safeSeek(chunks[i].audioStart); return; }
+        // Build list of chunk indices that have valid audio timestamps
+        const validIndices = [];
+        for (let i = 0; i < chunks.length; i++) {
+            if (chunks[i].audioStart !== null) validIndices.push(i);
+        }
+
+        // Sync navIdx from audio playback (called by update during playback)
+        const syncNavIdx = () => {
+            if (currentAudioChunkId) {
+                const idx = chunks.findIndex(c => c.id === currentAudioChunkId);
+                if (idx >= 0) navIdx = idx;
             }
         };
 
@@ -1405,21 +1326,55 @@
                 case 'Space':
                 case 'ArrowDown':
                     e.preventDefault();
-                    audio.paused ? audio.play() : audio.pause();
+                    if (audio.paused) {
+                        hideTooltip();
+                        tapResumeTime = null;
+                        audio.play();
+                    } else {
+                        audio.pause();
+                    }
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
-                    seekPrevChunk();
+                    if (!audio.paused) audio.pause();
+                    { // Find previous valid chunk
+                        const curPos = validIndices.indexOf(navIdx);
+                        if (curPos > 0) {
+                            navIdx = validIndices[curPos - 1];
+                        } else if (curPos === 0) {
+                            navIdx = validIndices[0];
+                        } else {
+                            // navIdx not in valid list; find nearest valid before current time
+                            navIdx = validIndices.length > 0 ? validIndices[0] : -1;
+                        }
+                        if (navIdx >= 0 && chunks[navIdx].audioStart !== null) {
+                            audio.currentTime = chunks[navIdx].audioStart;
+                        }
+                    }
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    seekNextChunk();
+                    if (!audio.paused) audio.pause();
+                    { // Find next valid chunk
+                        const curPos = validIndices.indexOf(navIdx);
+                        if (curPos >= 0 && curPos < validIndices.length - 1) {
+                            navIdx = validIndices[curPos + 1];
+                        } else if (curPos < 0) {
+                            // Not on any chunk yet; go to first
+                            navIdx = validIndices.length > 0 ? validIndices[0] : -1;
+                        }
+                        // If already at last chunk, do nothing
+                        if (navIdx >= 0 && chunks[navIdx].audioStart !== null) {
+                            audio.currentTime = chunks[navIdx].audioStart;
+                        }
+                    }
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    if (currentAudioChunkId) {
-                        const chunk = chunkMap.get(currentAudioChunkId);
-                        const el = document.querySelector(`.chunk[data-id="${currentAudioChunkId}"]`);
+                    if (navIdx >= 0) {
+                        if (!audio.paused) audio.pause();
+                        const chunk = chunks[navIdx];
+                        const el = document.querySelector(`.chunk[data-id="${chunk.id}"]`);
                         if (chunk && el) showTooltip(el, chunk);
                     }
                     break;
@@ -1430,11 +1385,32 @@
 
         // Rewind button
         const btnRewind = document.getElementById('btn-rewind');
-        if (btnRewind) btnRewind.addEventListener('click', () => { audio.currentTime = 0; });
+        if (btnRewind) btnRewind.addEventListener('click', () => { audio.currentTime = 0; navIdx = validIndices.length > 0 ? validIndices[0] : -1; });
 
         // Sentence-start button
         const btnSentence = document.getElementById('btn-sentence');
-        if (btnSentence) btnSentence.addEventListener('click', (e) => { e.stopPropagation(); seekPrevSentence(); });
+        if (btnSentence) btnSentence.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (navIdx < 0) return;
+            // Find start of current sentence
+            let si = navIdx;
+            for (let i = navIdx - 1; i >= 0; i--) {
+                if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
+                si = i;
+            }
+            // If already at sentence start, go to previous sentence
+            if (si === navIdx && si > 0) {
+                si = si - 1;
+                for (let i = si - 1; i >= 0; i--) {
+                    if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
+                    si = i;
+                }
+            }
+            // Find first valid timestamp at or after si
+            for (let i = si; i < chunks.length; i++) {
+                if (chunks[i].audioStart !== null) { navIdx = i; audio.currentTime = chunks[i].audioStart; return; }
+            }
+        });
     }
 
     // ================================================================
