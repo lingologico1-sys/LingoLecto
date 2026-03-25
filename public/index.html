@@ -1351,6 +1351,8 @@
     function showTooltip(element, chunk) {
         const aud = document.getElementById('readerAudio'); if (aud && !aud.paused) aud.pause();
         if (chunk.audioStart !== null && chunk.audioStart !== undefined) tapResumeTime = chunk.audioStart;
+        // Clear active-audio highlight from previous chunk
+        if (currentAudioChunkId) { document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); currentAudioChunkId = null; }
         if (activeChunkEl) activeChunkEl.classList.remove('tapped'); activeChunkEl = element; element.classList.add('tapped');
         const lang = $('langSelect').value; const translation = (chunk.translations && chunk.translations[lang]) || 'Translation not available'; const note = (chunk.notes && chunk.notes[lang]) || '';
         tooltipEl.innerHTML = `<div class="tooltip-content"><div class="tooltip-translation">${escapeHtml(translation)}</div>${note ? `<div class="tooltip-note">${escapeHtml(note)}</div>` : ''}</div>`; tooltipEl.classList.add('visible');
