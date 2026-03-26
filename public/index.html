@@ -1320,6 +1320,21 @@
             if (chunks[i].audioStart !== null) validIndices.push(i);
         }
 
+        // Dump chunk table to diagnostics
+        diag('[INIT] Total chunks: ' + chunks.length + ', with audio: ' + validIndices.length);
+        const table = chunks.map((c, i) => {
+            const flags = [];
+            if (c.audioStart === null) flags.push('NO_AUDIO');
+            else {
+                if (c.audioStart === c.audioEnd) flags.push('ZERO_DUR');
+                if (i > 0 && chunks[i-1].audioEnd !== null && c.audioStart < chunks[i-1].audioEnd) flags.push('OVERLAP_PREV');
+                if (i > 0 && chunks[i-1].audioEnd !== null && c.audioStart === chunks[i-1].audioEnd) flags.push('BOUNDARY');
+                if (i > 0 && chunks[i-1].audioEnd !== null && c.audioStart > chunks[i-1].audioEnd + 0.5) flags.push('GAP_' + (c.audioStart - chunks[i-1].audioEnd).toFixed(1) + 's');
+            }
+            return c.id + ' [' + i + '] ' + (c.audioStart !== null ? c.audioStart.toFixed(3) : 'null') + '-' + (c.audioEnd !== null ? c.audioEnd.toFixed(3) : 'null') + (flags.length ? ' !' + flags.join(',') : '') + ' "' + c.source.substring(0, 30).replace(/\n/g, '\\n') + '"';
+        }).join('\n');
+        diag('[CHUNK TABLE]\n' + table);
+
         // Sync navIdx from audio playback (called by update during playback)
         const syncNavIdx = () => {
             if (currentAudioChunkId) {
