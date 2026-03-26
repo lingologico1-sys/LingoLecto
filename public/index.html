@@ -1271,37 +1271,104 @@
         const isSkippable = ch => /^[«»""„‟‹›\u00AB\u00BB]$/.test(ch);
 
         // Two-pointer alignment: compare characters, skip source-only punctuation
+        // Track all matched alignment indices per chunk to detect internal gaps
         let ai = 0;
         const mismatches = [];
+        const chunkAlignIndices = []; // array of arrays
         state.readerData.chunks.forEach(c => {
             const src = c.source;
-            let firstAi = -1, lastAi = -1;
+            const indices = []; // alignment indices for this chunk
             for (let si = 0; si < src.length; si++) {
                 const sc = src[si];
-                if (sc.trim() === '') continue; // skip source whitespace
-                while (ai < chars.length && chars[ai].trim() === '') ai++; // skip alignment whitespace
+                if (sc.trim() === '') continue;
+                while (ai < chars.length && chars[ai].trim() === '') ai++;
                 if (ai >= chars.length) break;
 
                 const ac = chars[ai];
                 if (norm(sc) === norm(ac)) {
-                    // Match
-                    if (firstAi === -1) firstAi = ai;
-                    lastAi = ai;
+                    indices.push(ai);
                     ai++;
                 } else {
-                    // Mismatch: source has a char that alignment doesn't — skip source char
                     mismatches.push({chunk: c.id, si, sc, ai, ac, srcCtx: src.substring(Math.max(0,si-3), si+4)});
-                    // Don't advance ai — the alignment char may match the next source char
                 }
             }
-            if (firstAi >= 0 && lastAi >= 0) {
-                c.audioStart = starts[firstAi];
-                c.audioEnd = ends[lastAi];
+            chunkAlignIndices.push(indices);
+
+            if (indices.length > 0) {
+                c.audioStart = starts[indices[0]];
+                // Find audioEnd: use last character's end, but detect internal gaps > 2s
+                // If a gap is found, the real spoken content ended before the gap
+                let realEndIdx = indices[0];
+                for (let k = 1; k < indices.length; k++) {
+                    const prev = indices[k - 1];
+                    const cur = indices[k];
+                    // Check for a gap: if start of current char is > 2s after end of previous char
+                    if (starts[cur] - ends[prev] > 2.0) {
+                        break; // stop — content after this gap belongs to a different audio section
+                    }
+                    realEndIdx = cur;
+                }
+                c.audioEnd = ends[realEndIdx];
             } else {
                 c.audioStart = null;
                 c.audioEnd = null;
             }
         });
+
+        // Post-process: for chunks where gap detection truncated the audio,
+        // the remaining characters are after a long gap — re-map them using
+        // the characters AFTER the gap as the true audio range.
+        const chunks = state.readerData.chunks;
+        for (let ci = 0; ci < chunks.length; ci++) {
+            const c = chunks[ci];
+            const indices = chunkAlignIndices[ci];
+            if (!indices || indices.length < 2) continue;
+
+            // Find where the gap was detected
+            let gapAt = -1;
+            for (let k = 1; k < indices.length; k++) {
+                if (starts[indices[k]] - ends[indices[k-1]] > 2.0) {
+                    gapAt = k;
+                    break;
+                }
+            }
+            if (gapAt < 0) continue; // no gap in this chunk
+
+            // This chunk has a gap. The first part (before gap) is c's audio.
+            // The remaining characters (after gap) should be assigned to
+            // subsequent chunks that currently have zero-duration or wrong times.
+            const postGapStart = starts[indices[gapAt]];
+            const postGapEnd = ends[indices[indices.length - 1]];
+            diag('[ALIGN GAP] ' + c.id + ' gap at char ' + gapAt + '/' + indices.length +
+                '. Pre-gap audio: ' + c.audioStart.toFixed(3) + '-' + c.audioEnd.toFixed(3) +
+                '. Post-gap audio: ' + postGapStart.toFixed(3) + '-' + postGapEnd.toFixed(3));
+
+            // Re-distribute post-gap characters to this chunk and following chunks.
+            // Split: characters before gap stay with this chunk (already done).
+            // Characters after gap: assign proportionally to this chunk's remaining
+            // chars and subsequent chunks, based on their character positions.
+            // Simple approach: assign all post-gap indices to subsequent chunks
+            // starting from the chunk AFTER this one.
+            const postGapIndices = indices.slice(gapAt);
+            let pgi = 0; // pointer into postGapIndices
+            for (let ni = ci + 1; ni < chunks.length && pgi < postGapIndices.length; ni++) {
+                const nc = chunks[ni];
+                const nIndices = chunkAlignIndices[ni];
+                if (!nIndices || nIndices.length === 0) continue;
+
+                // Count how many of this chunk's alignment indices fall in the post-gap range
+                const chunkPostGapCount = nIndices.filter(idx => idx >= indices[gapAt]).length;
+                if (chunkPostGapCount === 0) continue;
+
+                // Assign audio range from the post-gap characters for this chunk
+                const startIdx = postGapIndices[pgi];
+                const endPgi = Math.min(pgi + chunkPostGapCount - 1, postGapIndices.length - 1);
+                const endIdx = postGapIndices[endPgi];
+                nc.audioStart = starts[startIdx];
+                nc.audioEnd = ends[endIdx];
+                pgi += chunkPostGapCount;
+            }
+        }
 
         // Log alignment diagnostics
         if (mismatches.length > 0) {
@@ -1309,7 +1376,6 @@
                 mismatches.map(m => m.chunk + ' si=' + m.si + ' src=' + JSON.stringify(m.sc) + ' align=' + JSON.stringify(m.ac) + ' ctx=' + JSON.stringify(m.srcCtx)).join('\n'));
         }
 
-        // Log source vs alignment length comparison
         const srcConcat = state.readerData.chunks.map(c => c.source).join('');
         const srcNonWS = srcConcat.replace(/\s/g, '').length;
         const alignNonWS = chars.filter(c => c.trim() !== '').length;
