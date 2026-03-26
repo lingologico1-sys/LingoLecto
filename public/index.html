@@ -232,17 +232,39 @@
                             <button class="btn btn-secondary json-viewer-apply" id="btn-apply-json">Apply to Editor</button>
                         </div>
                     </details>
+
+                    <div class="data-section" style="border-top:1px solid var(--border); padding-top:16px; margin-top:16px;">
+                        <div class="data-section-header">
+                            <div class="data-section-title">Voice Settings</div>
+                        </div>
+                        <div class="form-card" style="margin-top:8px;">
+                            <div class="field">
+                                <div class="field-label"><span>Voice ID</span></div>
+                                <input type="text" id="voiceId" value="JBFqnCBsd6RMkjVDRZzb" placeholder="ElevenLabs Voice ID" spellcheck="false" />
+                            </div>
+                            <div class="field">
+                                <div class="field-label"><span>Stability</span><span class="value" id="val-stability">0.50</span></div>
+                                <input type="range" id="stability" min="0" max="1" step="0.01" value="0.5" />
+                            </div>
+                            <div class="field">
+                                <div class="field-label"><span>Similarity Boost</span><span class="value" id="val-similarity">0.75</span></div>
+                                <input type="range" id="similarity_boost" min="0" max="1" step="0.01" value="0.75" />
+                            </div>
+                            <div class="field">
+                                <div class="field-label"><span>Style Exaggeration</span><span class="value" id="val-style">0.00</span></div>
+                                <input type="range" id="style" min="0" max="1" step="0.01" value="0.0" />
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-wrap">
+                                    <input type="checkbox" id="use_speaker_boost" checked />
+                                    <span class="checkbox-box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                    Speaker Boost
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-            </div>
-
-            <!-- Voice settings are hidden but preserved for JS references -->
-            <div id="voice-settings-store" style="display:none;">
-                <input type="text" id="voiceId" value="JBFqnCBsd6RMkjVDRZzb" />
-                <input type="range" id="stability" min="0" max="1" step="0.01" value="0.5" /><span id="val-stability">0.50</span>
-                <input type="range" id="similarity_boost" min="0" max="1" step="0.01" value="0.75" /><span id="val-similarity">0.75</span>
-                <input type="range" id="style" min="0" max="1" step="0.01" value="0.0" /><span id="val-style">0.00</span>
-                <input type="checkbox" id="use_speaker_boost" checked />
             </div>
 
             <div class="field-group" style="margin-bottom:12px;">
