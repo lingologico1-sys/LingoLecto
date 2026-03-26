@@ -212,8 +212,6 @@
                 <div class="input-tabs">
                     <button class="input-tab active" data-tab="lectos">Lectos</button>
                     <button class="input-tab" data-tab="editor">Rich Editor</button>
-                    <button class="input-tab" data-tab="plain">Plain Text</button>
-                    <button class="input-tab" data-tab="json">Paste JSON</button>
                 </div>
 
                 <div class="tab-panel active" id="panel-lectos">
@@ -236,51 +234,15 @@
                     </details>
                 </div>
 
-                <div class="tab-panel" id="panel-plain">
-                    <div class="field">
-                        <textarea id="plainTextInput" class="tall prose-input" placeholder="Collez votre texte français ici…"></textarea>
-                        <div class="field-hint">Sent to OpenAI for chunking, then ElevenLabs for audio.</div>
-                    </div>
-                </div>
-
-                <div class="tab-panel" id="panel-json">
-                    <div class="field">
-                        <div class="field-label"><span>Reader JSON</span></div>
-                        <textarea id="jsonInput" class="medium" placeholder='{"source_language": "fr", "chunks": [...]}'></textarea>
-                        <div class="field-hint">Skip OpenAI — paste pre-made Reader JSON. Audio still generated.</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label"><span>TipTap HTML</span> <span class="optional">Optional</span></div>
-                        <textarea id="jsonTiptapInput" class="short" placeholder='{"html": "<p>...</p>"}'></textarea>
-                    </div>
-                </div>
             </div>
 
-            <div class="form-card">
-                <div class="form-card-label">Voice Settings</div>
-                <div class="field">
-                    <div class="field-label"><span>Voice ID</span></div>
-                    <input type="text" id="voiceId" value="JBFqnCBsd6RMkjVDRZzb" placeholder="ElevenLabs Voice ID" spellcheck="false" />
-                </div>
-                <div class="field">
-                    <div class="field-label"><span>Stability</span><span class="value" id="val-stability">0.50</span></div>
-                    <input type="range" id="stability" min="0" max="1" step="0.01" value="0.5" />
-                </div>
-                <div class="field">
-                    <div class="field-label"><span>Similarity Boost</span><span class="value" id="val-similarity">0.75</span></div>
-                    <input type="range" id="similarity_boost" min="0" max="1" step="0.01" value="0.75" />
-                </div>
-                <div class="field">
-                    <div class="field-label"><span>Style Exaggeration</span><span class="value" id="val-style">0.00</span></div>
-                    <input type="range" id="style" min="0" max="1" step="0.01" value="0.0" />
-                </div>
-                <div class="field">
-                    <label class="checkbox-wrap">
-                        <input type="checkbox" id="use_speaker_boost" checked />
-                        <span class="checkbox-box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                        Speaker Boost
-                    </label>
-                </div>
+            <!-- Voice settings are hidden but preserved for JS references -->
+            <div id="voice-settings-store" style="display:none;">
+                <input type="text" id="voiceId" value="JBFqnCBsd6RMkjVDRZzb" />
+                <input type="range" id="stability" min="0" max="1" step="0.01" value="0.5" /><span id="val-stability">0.50</span>
+                <input type="range" id="similarity_boost" min="0" max="1" step="0.01" value="0.75" /><span id="val-similarity">0.75</span>
+                <input type="range" id="style" min="0" max="1" step="0.01" value="0.0" /><span id="val-style">0.00</span>
+                <input type="checkbox" id="use_speaker_boost" checked />
             </div>
 
             <div class="field-group" style="margin-bottom:12px;">
@@ -311,6 +273,7 @@
     <div class="view" id="reader-view">
         <div class="reader-tabs">
             <div class="reader-tab active" data-rtab="reader">Reader</div>
+            <div class="reader-tab" data-rtab="editor">Editor</div>
             <div class="reader-tab" data-rtab="data">Data</div>
         </div>
 
@@ -319,6 +282,63 @@
             <div class="reader-container">
                 <div class="audio-container" id="audio-container"></div>
                 <div class="reader-text" id="reader-text"></div>
+            </div>
+        </div>
+
+        <!-- Editor Panel -->
+        <div class="reader-panel" id="rpanel-editor">
+            <div class="data-container">
+                <div class="field" style="margin-bottom:16px;">
+                    <iframe id="readerEditorFrame" class="tiptap-editor-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-modals" title="TipTap Editor"></iframe>
+                    <div class="field-hint">Edit the Lecto content, then regenerate to re-chunk and re-voice.</div>
+                </div>
+                <details class="json-viewer" id="readerJsonViewer" style="margin-bottom:16px;">
+                    <summary class="json-viewer-toggle">TipTap JSON / HTML</summary>
+                    <div class="json-viewer-body">
+                        <textarea id="readerJsonViewerText" class="json-viewer-textarea" spellcheck="false" placeholder="Paste TipTap JSON here to load into editor..."></textarea>
+                        <button class="btn btn-secondary json-viewer-apply" id="btn-reader-apply-json">Apply to Editor</button>
+                    </div>
+                </details>
+
+                <div class="data-section" style="border-top:1px solid var(--border); padding-top:16px;">
+                    <div class="data-section-header">
+                        <div class="data-section-title">Voice Settings</div>
+                    </div>
+                    <div class="form-card" style="margin-top:8px;">
+                        <div class="field">
+                            <div class="field-label"><span>Voice ID</span></div>
+                            <input type="text" id="editor-voiceId" value="JBFqnCBsd6RMkjVDRZzb" placeholder="ElevenLabs Voice ID" spellcheck="false" />
+                        </div>
+                        <div class="field">
+                            <div class="field-label"><span>Stability</span><span class="value" id="editor-val-stability">0.50</span></div>
+                            <input type="range" id="editor-stability" min="0" max="1" step="0.01" value="0.5" />
+                        </div>
+                        <div class="field">
+                            <div class="field-label"><span>Similarity Boost</span><span class="value" id="editor-val-similarity">0.75</span></div>
+                            <input type="range" id="editor-similarity" min="0" max="1" step="0.01" value="0.75" />
+                        </div>
+                        <div class="field">
+                            <div class="field-label"><span>Style Exaggeration</span><span class="value" id="editor-val-style">0.00</span></div>
+                            <input type="range" id="editor-style" min="0" max="1" step="0.01" value="0.0" />
+                        </div>
+                        <div class="field">
+                            <label class="checkbox-wrap">
+                                <input type="checkbox" id="editor-speaker-boost" checked />
+                                <span class="checkbox-box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                Speaker Boost
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:16px;">
+                    <div class="field-group" style="margin-bottom:12px;">
+                        <label class="field-label" for="editor-password">Password</label>
+                        <input type="password" id="editor-password" placeholder="Enter password to regenerate" style="width:200px;">
+                    </div>
+                    <button class="btn btn-primary" id="btn-regenerate-lecto">Regenerate Lecto</button>
+                    <div class="status-msg" id="editor-status" style="margin-top:8px;"></div>
+                </div>
             </div>
         </div>
 
@@ -544,9 +564,6 @@
         try {
             const s = {
                 activeTab: activeTab,
-                plainTextInput: $('plainTextInput').value,
-                jsonInput: $('jsonInput').value,
-                jsonTiptapInput: $('jsonTiptapInput').value,
                 voiceId: $('voiceId').value,
                 stability: $('stability').value,
                 similarity_boost: $('similarity_boost').value,
@@ -565,15 +582,12 @@
             if (!raw) return;
             const s = JSON.parse(raw);
 
-            if (s.activeTab) {
+            if (s.activeTab && (s.activeTab === 'lectos' || s.activeTab === 'editor')) {
                 activeTab = s.activeTab;
                 document.querySelectorAll('.input-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
                 document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
                 $('panel-' + activeTab).classList.add('active');
             }
-            if (s.plainTextInput) $('plainTextInput').value = s.plainTextInput;
-            if (s.jsonInput) $('jsonInput').value = s.jsonInput;
-            if (s.jsonTiptapInput) $('jsonTiptapInput').value = s.jsonTiptapInput;
             if (s.voiceId) $('voiceId').value = s.voiceId;
             if (s.stability != null) { $('stability').value = s.stability; $('val-stability').textContent = parseFloat(s.stability).toFixed(2); }
             if (s.similarity_boost != null) { $('similarity_boost').value = s.similarity_boost; $('val-similarity').textContent = parseFloat(s.similarity_boost).toFixed(2); }
@@ -596,9 +610,6 @@
         if (!confirm('Reset everything to defaults? All saved text and settings will be erased.')) return;
         localStorage.removeItem(FORM_STORAGE_KEY);
         localStorage.removeItem(STORAGE_KEY);
-        $('plainTextInput').value = '';
-        $('jsonInput').value = '';
-        $('jsonTiptapInput').value = '';
         $('voiceId').value = 'JBFqnCBsd6RMkjVDRZzb';
         $('stability').value = '0.5'; $('val-stability').textContent = '0.50';
         $('similarity_boost').value = '0.75'; $('val-similarity').textContent = '0.75';
@@ -689,9 +700,7 @@
     styleEl.addEventListener('input', () => { $('val-style').textContent = parseFloat(styleEl.value).toFixed(2); debouncedSave(); });
 
     // Save on text input changes
-    ['plainTextInput','jsonInput','jsonTiptapInput','voiceId'].forEach(id => {
-        $(id).addEventListener('input', debouncedSave);
-    });
+    $('voiceId').addEventListener('input', debouncedSave);
     $('use_speaker_boost').addEventListener('change', saveFormState);
     $('btn-reset-all').addEventListener('click', resetAll);
 
@@ -816,34 +825,15 @@
         let readerData = null;
         let needsChunking = true;
 
-        if (activeTab === 'plain') {
-            sourceText = $('plainTextInput').value.trim();
-            if (!sourceText) { setStatus('Please enter some French text.', 'error'); return; }
-
-        } else if (activeTab === 'editor') {
+        if (activeTab === 'editor') {
             if (!editorHtml || !editorHtml.trim()) { setStatus('Please write something in the editor.', 'error'); return; }
             tiptapData = { html: editorHtml, json: editorJson };
             sourceText = extractTextFromHtml(editorHtml);
             if (!sourceText.trim()) { setStatus('Could not extract text from editor content.', 'error'); return; }
 
         } else if (activeTab === 'lectos') {
-            setStatus('Switch to Rich Editor, Plain Text, or Paste JSON tab to generate.', 'error');
+            setStatus('Switch to Rich Editor tab to generate.', 'error');
             return;
-
-        } else if (activeTab === 'json') {
-            const raw = $('jsonInput').value.trim();
-            if (!raw) { setStatus('Please paste Reader JSON.', 'error'); return; }
-            try {
-                readerData = JSON.parse(raw);
-                if (!readerData.source_language || !readerData.chunks || !readerData.chunks.length) throw new Error('Missing source_language or chunks.');
-                needsChunking = false;
-                sourceText = readerData.chunks.map(c => c.source).join('');
-            } catch (e) { setStatus('Invalid Reader JSON: ' + e.message, 'error'); return; }
-            const tiptapRaw = $('jsonTiptapInput').value.trim();
-            if (tiptapRaw) {
-                try { tiptapData = JSON.parse(tiptapRaw); if (!tiptapData.html) throw new Error("Must include 'html'."); }
-                catch (e) { setStatus('Invalid TipTap JSON: ' + e.message, 'error'); return; }
-            }
         }
 
         const voiceId = $('voiceId').value.trim();
@@ -956,7 +946,7 @@
     }
 
     // ================================================================
-    // READER TABS (Reader / Data)
+    // READER TABS (Reader / Editor / Data)
     // ================================================================
     document.querySelectorAll('.reader-tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -965,7 +955,210 @@
             tab.classList.add('active');
             $('rpanel-' + tab.dataset.rtab).classList.add('active');
             if (tab.dataset.rtab === 'data') populateDataPanel();
+            if (tab.dataset.rtab === 'editor') initReaderEditor();
         });
+    });
+
+    // ================================================================
+    // READER EDITOR PANEL
+    // ================================================================
+    let readerEditorReady = false;
+    let readerEditorJson = null;
+    let readerEditorHtml = '';
+
+    function initReaderEditor() {
+        const iframe = $('readerEditorFrame');
+        if (!readerEditorReady) {
+            const editorHTML = buildEditorHTML();
+            const blob = new Blob([editorHTML], { type: 'text/html' });
+            iframe.src = URL.createObjectURL(blob);
+            readerEditorReady = true;
+
+            window.addEventListener('message', (e) => {
+                if (!e.data || typeof e.data !== 'object') return;
+                if (e.source !== iframe.contentWindow) return;
+                if (e.data.type === 'content-changed') {
+                    readerEditorJson = e.data.detail.json;
+                    readerEditorHtml = e.data.detail.html;
+                } else if (e.data.type === 'ready') {
+                    loadLectoIntoReaderEditor();
+                }
+            });
+        } else {
+            loadLectoIntoReaderEditor();
+        }
+
+        // Pre-fill password
+        if (getAuthToken()) $('editor-password').value = getAuthToken();
+
+        // Sync voice settings from hidden store
+        $('editor-voiceId').value = $('voiceId').value;
+        $('editor-stability').value = $('stability').value;
+        $('editor-val-stability').textContent = parseFloat($('stability').value).toFixed(2);
+        $('editor-similarity').value = $('similarity_boost').value;
+        $('editor-val-similarity').textContent = parseFloat($('similarity_boost').value).toFixed(2);
+        $('editor-style').value = $('style').value;
+        $('editor-val-style').textContent = parseFloat($('style').value).toFixed(2);
+        $('editor-speaker-boost').checked = $('use_speaker_boost').checked;
+    }
+
+    function loadLectoIntoReaderEditor() {
+        const iframe = $('readerEditorFrame');
+        if (!iframe || !iframe.contentWindow) return;
+        if (state.tiptapData && state.tiptapData.json) {
+            iframe.contentWindow.postMessage({ type: 'set-content', json: state.tiptapData.json }, '*');
+        } else if (state.tiptapData && state.tiptapData.html) {
+            iframe.contentWindow.postMessage({ type: 'set-content', html: state.tiptapData.html }, '*');
+        } else if (state.readerData && state.readerData.chunks) {
+            const html = '<p>' + state.readerData.chunks.map(c => c.source).join('').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+            iframe.contentWindow.postMessage({ type: 'set-content', html: html }, '*');
+        }
+    }
+
+    // Editor panel slider labels
+    $('editor-stability').addEventListener('input', function() { $('editor-val-stability').textContent = parseFloat(this.value).toFixed(2); });
+    $('editor-similarity').addEventListener('input', function() { $('editor-val-similarity').textContent = parseFloat(this.value).toFixed(2); });
+    $('editor-style').addEventListener('input', function() { $('editor-val-style').textContent = parseFloat(this.value).toFixed(2); });
+
+    // Apply JSON button in reader editor panel
+    $('btn-reader-apply-json').addEventListener('click', () => {
+        const raw = $('readerJsonViewerText').value.trim();
+        if (!raw) return;
+        try {
+            const parsed = JSON.parse(raw);
+            const html = parsed.html || '';
+            const docJson = Object.assign({}, parsed);
+            delete docJson.html;
+            const iframe = $('readerEditorFrame');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({ type: 'set-content', json: docJson }, '*');
+            }
+            readerEditorJson = docJson;
+            readerEditorHtml = html;
+        } catch (e) { alert('Invalid JSON: ' + e.message); }
+    });
+
+    // Regenerate Lecto button
+    $('btn-regenerate-lecto').addEventListener('click', async () => {
+        const html = readerEditorHtml;
+        if (!html || !html.trim()) {
+            $('editor-status').textContent = 'Editor is empty.';
+            $('editor-status').className = 'status-msg error';
+            return;
+        }
+
+        const pw = $('editor-password').value.trim();
+        if (!pw) {
+            $('editor-status').textContent = 'Password is required.';
+            $('editor-status').className = 'status-msg error';
+            return;
+        }
+        setAuthToken(pw);
+
+        const sourceText = extractTextFromHtml(html);
+        if (!sourceText.trim()) {
+            $('editor-status').textContent = 'Could not extract text from editor.';
+            $('editor-status').className = 'status-msg error';
+            return;
+        }
+
+        const tiptapData = { html: html, json: readerEditorJson };
+        const btn = $('btn-regenerate-lecto');
+        const status = $('editor-status');
+        btn.disabled = true;
+
+        try {
+            // Step 1: Chunk
+            status.textContent = 'Sending text to OpenAI for chunking & translation…';
+            status.className = 'status-msg loading';
+            const startRes = await authedFetch('/api/chunk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sourceText })
+            });
+            if (!startRes.ok) {
+                const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` }));
+                throw new Error(err.error || `Chunk failed: ${startRes.status}`);
+            }
+            const { jobId } = await startRes.json();
+
+            const readerData = await new Promise((resolve, reject) => {
+                const poll = async () => {
+                    try {
+                        const pollRes = await fetch('/api/chunk/' + jobId);
+                        if (!pollRes.ok) {
+                            let errMsg = `Poll failed: HTTP ${pollRes.status}`;
+                            try { const errData = await pollRes.json(); errMsg = errData.error || errMsg; } catch(_) {}
+                            reject(new Error(errMsg)); return;
+                        }
+                        const data = await pollRes.json();
+                        if (data.status === 'processing') { setTimeout(poll, 2000); return; }
+                        if (data.status === 'error') { reject(new Error(data.error || 'Chunking failed')); return; }
+                        resolve(data.result);
+                    } catch (e) { reject(new Error('Poll error: ' + (e.message || e))); }
+                };
+                poll();
+            });
+
+            if (!readerData.chunks || !readerData.chunks.length) throw new Error('OpenAI returned no chunks.');
+            const newSourceText = readerData.chunks.map(c => c.source).join('');
+
+            // Step 2: Audio
+            status.textContent = 'Generating audio with ElevenLabs…';
+            status.className = 'status-msg loading';
+            const voiceId = $('editor-voiceId').value.trim() || 'JBFqnCBsd6RMkjVDRZzb';
+            const audioRes = await authedFetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    voiceId,
+                    text: newSourceText,
+                    stability: parseFloat($('editor-stability').value),
+                    similarity_boost: parseFloat($('editor-similarity').value),
+                    style: parseFloat($('editor-style').value),
+                    use_speaker_boost: $('editor-speaker-boost').checked
+                })
+            });
+            if (!audioRes.ok) {
+                const err = await audioRes.json().catch(() => ({ error: `HTTP ${audioRes.status}` }));
+                throw new Error(err.error || 'ElevenLabs failed');
+            }
+            const audioData = await audioRes.json();
+
+            // Update state
+            state.readerData = readerData;
+            state.alignmentData = audioData.alignment || null;
+            state.tiptapData = tiptapData;
+            state.audioBase64 = audioData.audio_base64 || null;
+            state.audioUrl = null;
+            state.tappedIds = new Set();
+            state.tapCount = 0;
+            saveState();
+
+            // Sync voice settings back to hidden store
+            $('voiceId').value = $('editor-voiceId').value;
+            $('stability').value = $('editor-stability').value; $('val-stability').textContent = $('editor-val-stability').textContent;
+            $('similarity_boost').value = $('editor-similarity').value; $('val-similarity').textContent = $('editor-val-similarity').textContent;
+            $('style').value = $('editor-style').value; $('val-style').textContent = $('editor-val-style').textContent;
+            $('use_speaker_boost').checked = $('editor-speaker-boost').checked;
+            saveFormState();
+
+            status.textContent = `Regenerated — ${newSourceText.length.toLocaleString()} characters`;
+            status.className = 'status-msg success';
+
+            // Switch to Reader tab and re-render
+            document.querySelectorAll('.reader-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.reader-panel').forEach(p => p.classList.remove('active'));
+            document.querySelector('[data-rtab="reader"]').classList.add('active');
+            $('rpanel-reader').classList.add('active');
+            renderReader();
+
+        } catch (e) {
+            status.textContent = 'Error: ' + e.message;
+            status.className = 'status-msg error';
+        } finally {
+            btn.disabled = false;
+        }
     });
 
     function populateDataPanel() {
