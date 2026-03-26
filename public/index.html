@@ -1283,10 +1283,12 @@
             const t = audio.currentTime; let aid = null; let fallback = null;
             for (const c of state.readerData.chunks) {
                 if (c.audioStart === null || c.audioEnd === null) continue;
-                // Exact match takes priority
-                if (t >= c.audioStart && t <= c.audioEnd) { aid = c.id; break; }
-                // Fallback: small tolerance after audioEnd to bridge gaps (but only if no exact match found)
-                if (!fallback && t >= c.audioStart && t <= c.audioEnd + 0.1) fallback = c.id;
+                // Use exclusive end so boundary times belong to the NEXT chunk
+                if (t >= c.audioStart && t < c.audioEnd) { aid = c.id; break; }
+                // Exact end match (for the very last moment of a chunk)
+                if (!aid && t === c.audioEnd) { fallback = c.id; }
+                // Small tolerance after audioEnd to bridge gaps
+                if (!fallback && t >= c.audioStart && t < c.audioEnd + 0.1) fallback = c.id;
             }
             if (!aid) aid = fallback;
             if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); syncNavIdx(); }
@@ -1319,6 +1321,15 @@
             }
         };
 
+        // Directly highlight a chunk by index (used by arrow navigation to avoid update() race)
+        const highlightChunkAt = (idx) => {
+            const cid = chunks[idx].id;
+            if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio'));
+            document.querySelectorAll(`.chunk[data-id="${cid}"]`).forEach(el => el.classList.add('active-audio'));
+            currentAudioChunkId = cid;
+            scrollToChunk(cid);
+        };
+
         // --- Keyboard shortcuts ---
         const onKeyDown = (e) => {
             if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
@@ -1348,6 +1359,7 @@
                         const newPos = curPos > 0 ? curPos - 1 : 0;
                         navIdx = validIndices[newPos];
                         audio.currentTime = chunks[navIdx].audioStart;
+                        highlightChunkAt(navIdx);
                     }
                     break;
                 case 'ArrowRight':
@@ -1367,6 +1379,7 @@
                         if (newPos < validIndices.length) {
                             navIdx = validIndices[newPos];
                             audio.currentTime = chunks[navIdx].audioStart;
+                            highlightChunkAt(navIdx);
                         }
                     }
                     break;
