@@ -2037,7 +2037,7 @@ else if(cmd==='tblDelete')delTable()}}
 try{
 buildFontMenu();buildColors();buildEmoji();
 editor=new Editor({element:document.getElementById('editor'),extensions:[StarterKit,Underline,TextStyle,Color,Highlight.configure({multicolor:true}),FontFamily,FontSize,TextAlign.configure({types:['heading','paragraph']}),Link.configure({openOnClick:false}),ResizableImage.configure({inline:true,allowBase64:true}),Table.configure({resizable:true}),TableRow,TableHeader,TableCell,CharacterCount],onUpdate:()=>{const j=editor.getJSON();send('content-changed',{json:j,jsonString:JSON.stringify(j),html:editor.getHTML()});updateToolbar()},onSelectionUpdate:updateToolbar,onCreate:()=>{editor.chain().focus().setFontFamily('Comic Sans MS').run();updateToolbar();send('ready',{ok:true})}});
-window.addEventListener('message',function(ev){try{var d=ev.data||{};if(d.type==='set-content'&&d.json&&editor){editor.commands.setContent(d.json,false)}}catch(e){console.error('set-content failed',e)}});
+window.addEventListener('message',function(ev){try{var d=ev.data||{};if(d.type==='set-content'&&editor){if(d.json){editor.commands.setContent(d.json,false)}else if(d.html){editor.commands.setContent(d.html,false)}}}catch(e){console.error('set-content failed',e)}});
 wire();
 
 /* ── Image Resize System ── */
