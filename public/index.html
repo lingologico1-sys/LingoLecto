@@ -1259,19 +1259,39 @@
         const starts = state.alignmentData.character_start_times_seconds;
         const ends = state.alignmentData.character_end_times_seconds;
 
-        // Match non-whitespace characters between source and alignment,
-        // skipping whitespace independently on each side to prevent drift.
-        let ai = 0; // alignment index
+        // Normalize a character for fuzzy matching (lowercase, strip diacritics for punctuation)
+        const norm = ch => {
+            // Treat various quotes/guillemets as equivalent
+            if ('«»""„‟‹›'.includes(ch)) return '"';
+            if ("''ʼ`´".includes(ch)) return "'";
+            if ('–—―'.includes(ch)) return '-';
+            if ('…'.includes(ch)) return '.';
+            return ch.toLowerCase();
+        };
+        const isSkippable = ch => /^[«»""„‟‹›\u00AB\u00BB]$/.test(ch);
+
+        // Two-pointer alignment: compare characters, skip source-only punctuation
+        let ai = 0;
+        const mismatches = [];
         state.readerData.chunks.forEach(c => {
             const src = c.source;
             let firstAi = -1, lastAi = -1;
             for (let si = 0; si < src.length; si++) {
-                if (src[si].trim() === '') continue; // skip source whitespace
+                const sc = src[si];
+                if (sc.trim() === '') continue; // skip source whitespace
                 while (ai < chars.length && chars[ai].trim() === '') ai++; // skip alignment whitespace
-                if (ai < chars.length) {
+                if (ai >= chars.length) break;
+
+                const ac = chars[ai];
+                if (norm(sc) === norm(ac)) {
+                    // Match
                     if (firstAi === -1) firstAi = ai;
                     lastAi = ai;
                     ai++;
+                } else {
+                    // Mismatch: source has a char that alignment doesn't — skip source char
+                    mismatches.push({chunk: c.id, si, sc, ai, ac, srcCtx: src.substring(Math.max(0,si-3), si+4)});
+                    // Don't advance ai — the alignment char may match the next source char
                 }
             }
             if (firstAi >= 0 && lastAi >= 0) {
@@ -1282,6 +1302,18 @@
                 c.audioEnd = null;
             }
         });
+
+        // Log alignment diagnostics
+        if (mismatches.length > 0) {
+            diag('[ALIGN] ' + mismatches.length + ' mismatches:\n' +
+                mismatches.map(m => m.chunk + ' si=' + m.si + ' src=' + JSON.stringify(m.sc) + ' align=' + JSON.stringify(m.ac) + ' ctx=' + JSON.stringify(m.srcCtx)).join('\n'));
+        }
+
+        // Log source vs alignment length comparison
+        const srcConcat = state.readerData.chunks.map(c => c.source).join('');
+        const srcNonWS = srcConcat.replace(/\s/g, '').length;
+        const alignNonWS = chars.filter(c => c.trim() !== '').length;
+        diag('[ALIGN] source non-WS chars: ' + srcNonWS + ', alignment non-WS chars: ' + alignNonWS + ', diff: ' + (srcNonWS - alignNonWS));
     }
 
     function setupAudioSync() {
