@@ -43,13 +43,6 @@
         .form-card-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 16px; }
 
         /* Tabs */
-        .input-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid var(--border-light); }
-        .input-tab { padding: 10px 20px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; border: none; background: none; font-family: 'DM Sans', sans-serif; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s, border-color 0.15s; }
-        .input-tab:hover { color: var(--ink); }
-        .input-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-        .tab-panel { display: none; }
-        .tab-panel.active { display: block; }
-
         .field { margin-bottom: 20px; }
         .field:last-child { margin-bottom: 0; }
         .field-label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
@@ -88,14 +81,6 @@
         .status-msg.success { display: block; color: var(--success); background: var(--success-bg); }
         .status-msg.loading { display: block; color: var(--accent); background: var(--accent-glow); }
 
-        .progress-steps { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-        .progress-step { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 4px 10px; border-radius: 12px; background: var(--border-light); transition: all 0.2s; }
-        .progress-step.active { color: white; background: var(--accent); }
-        .progress-step.done { color: var(--success); background: var(--success-bg); }
-        .progress-arrow { color: var(--border); font-size: 12px; }
-        .progress-bar-wrap { width: 100%; height: 6px; background: var(--border-light); border-radius: 3px; margin-top: 8px; overflow: hidden; }
-        .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.3s ease; }
-        .progress-timer { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
         /* TipTap Editor Embed */
         .tiptap-editor-frame { width: 100%; height: 500px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -208,51 +193,9 @@
             <p class="setup-subtitle">Write or paste your French text, generate chunks with translations, add spoken audio, and open the interactive reader.</p>
 
             <div class="form-card">
-                <div class="form-card-label">French Text</div>
-                <div class="input-tabs">
-                    <button class="input-tab active" data-tab="lectos">Lectos</button>
-                    <button class="input-tab" data-tab="editor">Rich Editor</button>
-                    <button class="input-tab" data-tab="plain">Plain Text</button>
-                    <button class="input-tab" data-tab="json">Paste JSON</button>
-                </div>
-
-                <div class="tab-panel active" id="panel-lectos">
-                    <div id="setup-lectos-list" style="min-height:80px;">
-                        <div style="font-size:12px; color:var(--text-secondary);">Loading...</div>
-                    </div>
-                </div>
-
-                <div class="tab-panel" id="panel-editor">
-                    <div class="field">
-                        <iframe id="tiptapEditorFrame" class="tiptap-editor-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-modals" title="TipTap Editor"></iframe>
-                        <div class="field-hint">Write rich text with formatting, images, and tables. Text is extracted for chunking; HTML is preserved for the reader.</div>
-                    </div>
-                    <details class="json-viewer" id="jsonViewer">
-                        <summary class="json-viewer-toggle">TipTap JSON / HTML</summary>
-                        <div class="json-viewer-body">
-                            <textarea id="jsonViewerText" class="json-viewer-textarea" spellcheck="false" placeholder="Paste TipTap JSON here to load into editor..."></textarea>
-                            <button class="btn btn-secondary json-viewer-apply" id="btn-apply-json">Apply to Editor</button>
-                        </div>
-                    </details>
-                </div>
-
-                <div class="tab-panel" id="panel-plain">
-                    <div class="field">
-                        <textarea id="plainTextInput" class="tall prose-input" placeholder="Collez votre texte français ici…"></textarea>
-                        <div class="field-hint">Sent to OpenAI for chunking, then ElevenLabs for audio.</div>
-                    </div>
-                </div>
-
-                <div class="tab-panel" id="panel-json">
-                    <div class="field">
-                        <div class="field-label"><span>Reader JSON</span></div>
-                        <textarea id="jsonInput" class="medium" placeholder='{"source_language": "fr", "chunks": [...]}'></textarea>
-                        <div class="field-hint">Skip OpenAI — paste pre-made Reader JSON. Audio still generated.</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label"><span>TipTap HTML</span> <span class="optional">Optional</span></div>
-                        <textarea id="jsonTiptapInput" class="short" placeholder='{"html": "<p>...</p>"}'></textarea>
-                    </div>
+                <div class="form-card-label">Lectos</div>
+                <div id="setup-lectos-list" style="min-height:80px;">
+                    <div style="font-size:12px; color:var(--text-secondary);">Loading...</div>
                 </div>
             </div>
 
@@ -283,27 +226,7 @@
                 </div>
             </div>
 
-            <div class="field-group" style="margin-bottom:12px;">
-                <label class="field-label" for="auth-password">Password</label>
-                <input type="password" id="auth-password" placeholder="Enter password to generate" style="width:200px;">
-            </div>
-            <button class="btn btn-primary" id="btn-generate">Generate & Open Reader</button>
             <button class="btn btn-secondary" id="btn-restore" style="display:none;">Restore Previous Session</button>
-
-            <div class="status-msg" id="status-msg">
-                <div class="progress-steps" id="progress-steps" style="display:none;">
-                    <span class="progress-step" id="step-chunk">1 Chunking</span>
-                    <span class="progress-arrow">→</span>
-                    <span class="progress-step" id="step-audio">2 Audio</span>
-                    <span class="progress-arrow">→</span>
-                    <span class="progress-step" id="step-done">3 Done</span>
-                </div>
-                <div class="progress-bar-wrap" id="progress-bar-wrap" style="display:none;">
-                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
-                </div>
-                <div class="progress-timer" id="progress-timer" style="display:none;"></div>
-                <span id="status-text"></span>
-            </div>
         </div>
     </div>
 
@@ -311,6 +234,7 @@
     <div class="view" id="reader-view">
         <div class="reader-tabs">
             <div class="reader-tab active" data-rtab="reader">Reader</div>
+            <div class="reader-tab" data-rtab="edit">Edit</div>
             <div class="reader-tab" data-rtab="data">Data</div>
         </div>
 
@@ -319,6 +243,29 @@
             <div class="reader-container">
                 <div class="audio-container" id="audio-container"></div>
                 <div class="reader-text" id="reader-text"></div>
+            </div>
+        </div>
+
+        <!-- Edit Panel -->
+        <div class="reader-panel" id="rpanel-edit">
+            <div class="data-container">
+                <div class="field" style="margin-bottom:16px;">
+                    <iframe id="editTiptapFrame" class="tiptap-editor-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-modals" title="TipTap Editor"></iframe>
+                    <div class="field-hint">Edit the Lecto content. Changes will be re-chunked and re-voiced when you regenerate.</div>
+                </div>
+                <details class="json-viewer" id="editJsonViewer" style="margin-bottom:16px;">
+                    <summary class="json-viewer-toggle">TipTap JSON / HTML</summary>
+                    <div class="json-viewer-body">
+                        <textarea id="editJsonViewerText" class="json-viewer-textarea" spellcheck="false" placeholder="Paste TipTap JSON here to load into editor..."></textarea>
+                        <button class="btn btn-secondary json-viewer-apply" id="btn-edit-apply-json">Apply to Editor</button>
+                    </div>
+                </details>
+                <div class="field-group" style="margin-bottom:12px;">
+                    <label class="field-label" for="edit-password">Password</label>
+                    <input type="password" id="edit-password" placeholder="Enter password to regenerate" style="width:200px;">
+                </div>
+                <button class="btn btn-primary" id="btn-edit-regenerate">Regenerate Lecto</button>
+                <div class="status-msg" id="edit-status" style="margin-top:8px;"></div>
             </div>
         </div>
 
@@ -469,9 +416,7 @@
     function diag(msg, data) { const ts = new Date().toISOString().slice(11,23); const entry = ts + ' ' + msg + (data ? ' ' + JSON.stringify(data) : ''); diagLog.push(entry); console.log(entry); const el = document.getElementById('diag-content'); if (el) el.textContent = diagLog.join('\n'); }
     let syncRAF = null;
 
-    // Editor state
-    let editorJson = null;
-    let editorHtml = '';
+    // Editor state (used by edit panel in reader view)
 
     const $ = id => document.getElementById(id);
 
@@ -509,31 +454,8 @@
     }
 
     // ================================================================
-    // TIPTAP EDITOR IFRAME
+    // TIPTAP EDITOR (used by edit panel in reader view)
     // ================================================================
-    // The editor runs in an iframe using the same Wix custom element code (minus Wix-specific bits).
-    // Communication via postMessage.
-
-    function initEditorIframe() {
-        const iframe = $('tiptapEditorFrame');
-        const editorHTML = buildEditorHTML();
-        const blob = new Blob([editorHTML], { type: 'text/html' });
-        iframe.src = URL.createObjectURL(blob);
-
-        window.addEventListener('message', (event) => {
-            if (event.source !== iframe.contentWindow) return;
-            const data = event.data || {};
-            if (data.type === 'content-changed') {
-                editorJson = data.detail.json;
-                editorHtml = data.detail.html;
-                saveFormState();
-                updateJsonViewer();
-            }
-            if (data.type === 'ready') {
-                restoreEditorContent();
-            }
-        });
-    }
 
     // ================================================================
     // FORM PERSISTENCE (localStorage)
@@ -543,17 +465,11 @@
     function saveFormState() {
         try {
             const s = {
-                activeTab: activeTab,
-                plainTextInput: $('plainTextInput').value,
-                jsonInput: $('jsonInput').value,
-                jsonTiptapInput: $('jsonTiptapInput').value,
                 voiceId: $('voiceId').value,
                 stability: $('stability').value,
                 similarity_boost: $('similarity_boost').value,
                 style: $('style').value,
-                use_speaker_boost: $('use_speaker_boost').checked,
-                editorJson: editorJson,
-                editorHtml: editorHtml
+                use_speaker_boost: $('use_speaker_boost').checked
             };
             localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(s));
         } catch (e) {}
@@ -564,118 +480,32 @@
             const raw = localStorage.getItem(FORM_STORAGE_KEY);
             if (!raw) return;
             const s = JSON.parse(raw);
-
-            if (s.activeTab) {
-                activeTab = s.activeTab;
-                document.querySelectorAll('.input-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
-                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-                $('panel-' + activeTab).classList.add('active');
-            }
-            if (s.plainTextInput) $('plainTextInput').value = s.plainTextInput;
-            if (s.jsonInput) $('jsonInput').value = s.jsonInput;
-            if (s.jsonTiptapInput) $('jsonTiptapInput').value = s.jsonTiptapInput;
             if (s.voiceId) $('voiceId').value = s.voiceId;
             if (s.stability != null) { $('stability').value = s.stability; $('val-stability').textContent = parseFloat(s.stability).toFixed(2); }
             if (s.similarity_boost != null) { $('similarity_boost').value = s.similarity_boost; $('val-similarity').textContent = parseFloat(s.similarity_boost).toFixed(2); }
             if (s.style != null) { $('style').value = s.style; $('val-style').textContent = parseFloat(s.style).toFixed(2); }
             if (s.use_speaker_boost != null) $('use_speaker_boost').checked = s.use_speaker_boost;
-            if (s.editorJson) editorJson = s.editorJson;
-            if (s.editorHtml) editorHtml = s.editorHtml;
         } catch (e) {}
-    }
-
-    function restoreEditorContent() {
-        if (!editorJson) return;
-        const iframe = $('tiptapEditorFrame');
-        if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({ type: 'set-content', json: editorJson }, '*');
-        }
     }
 
     function resetAll() {
         if (!confirm('Reset everything to defaults? All saved text and settings will be erased.')) return;
         localStorage.removeItem(FORM_STORAGE_KEY);
         localStorage.removeItem(STORAGE_KEY);
-        $('plainTextInput').value = '';
-        $('jsonInput').value = '';
-        $('jsonTiptapInput').value = '';
         $('voiceId').value = 'JBFqnCBsd6RMkjVDRZzb';
         $('stability').value = '0.5'; $('val-stability').textContent = '0.50';
         $('similarity_boost').value = '0.75'; $('val-similarity').textContent = '0.75';
         $('style').value = '0.0'; $('val-style').textContent = '0.00';
         $('use_speaker_boost').checked = true;
-        editorJson = null; editorHtml = '';
-        const iframe = $('tiptapEditorFrame');
-        if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({ type: 'set-content', json: { type: 'doc', content: [{ type: 'paragraph' }] } }, '*');
-        }
-        activeTab = 'lectos';
-        document.querySelectorAll('.input-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'lectos'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        $('panel-lectos').classList.add('active');
         $('btn-restore').style.display = 'none';
+        editEditorReady = false; editEditorJson = null; editEditorHtml = '';
         state.readerData = null; state.audioBase64 = null; state.audioUrl = null; state.alignmentData = null; state.tiptapData = null; state.tapCount = 0; state.tappedIds = new Set();
         showSetupView();
     }
 
-    // ================================================================
-    // JSON VIEWER (below editor)
-    // ================================================================
-    function updateJsonViewer() {
-        const ta = $('jsonViewerText');
-        if (!ta || !$('jsonViewer').open) return;
-        if (ta === document.activeElement) return; // don't overwrite while user is editing
-        const combined = editorJson ? Object.assign({}, editorJson, { html: editorHtml || '' }) : null;
-        ta.value = combined ? JSON.stringify(combined, null, 2) : '';
-    }
-
-    // Update when viewer is opened
-    $('jsonViewer').addEventListener('toggle', () => {
-        if ($('jsonViewer').open) updateJsonViewer();
-    });
-
-    $('btn-apply-json').addEventListener('click', () => {
-        const ta = $('jsonViewerText');
-        const raw = ta.value.trim();
-        if (!raw) return;
-        try {
-            const parsed = JSON.parse(raw);
-            // Extract html if present, then pass the doc JSON to the editor
-            const html = parsed.html || '';
-            const docJson = Object.assign({}, parsed);
-            delete docJson.html;
-            const iframe = $('tiptapEditorFrame');
-            if (iframe && iframe.contentWindow) {
-                iframe.contentWindow.postMessage({ type: 'set-content', json: docJson }, '*');
-            }
-            editorJson = docJson;
-            editorHtml = html;
-            saveFormState();
-        } catch (e) {
-            alert('Invalid JSON: ' + e.message);
-        }
-    });
-
     // Debounced save for text inputs
     let _saveTimer = null;
     function debouncedSave() { clearTimeout(_saveTimer); _saveTimer = setTimeout(saveFormState, 500); }
-
-    // ================================================================
-    // TABS
-    // ================================================================
-    let activeTab = 'lectos';
-
-    document.querySelectorAll('.input-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.input-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-            tab.classList.add('active');
-            activeTab = tab.dataset.tab;
-            $('panel-' + activeTab).classList.add('active');
-            if (activeTab === 'lectos') loadLectos();
-            saveFormState();
-        });
-    });
 
     // ================================================================
     // SETUP UI
@@ -689,230 +519,26 @@
     styleEl.addEventListener('input', () => { $('val-style').textContent = parseFloat(styleEl.value).toFixed(2); debouncedSave(); });
 
     // Save on text input changes
-    ['plainTextInput','jsonInput','jsonTiptapInput','voiceId'].forEach(id => {
-        $(id).addEventListener('input', debouncedSave);
-    });
+    $('voiceId').addEventListener('input', debouncedSave);
     $('use_speaker_boost').addEventListener('change', saveFormState);
     $('btn-reset-all').addEventListener('click', resetAll);
 
     // Restore saved form state on load
     loadFormState();
-    if (getAuthToken()) $('auth-password').value = getAuthToken();
+    // auth-password field removed; password now in edit panel
 
     if (localStorage.getItem(STORAGE_KEY)) $('btn-restore').style.display = '';
 
     $('btn-restore').addEventListener('click', () => {
         if (loadState()) showReaderView();
-        else setStatus('No saved session found.', 'error');
+        else alert('No saved session found.');
     });
-
-    function setStatus(msg, type) {
-        $('status-text').textContent = msg;
-        $('status-msg').className = 'status-msg ' + (type || '');
-        if (type !== 'loading') {
-            $('progress-steps').style.display = 'none';
-            $('progress-bar-wrap').style.display = 'none';
-            $('progress-timer').style.display = 'none';
-        }
-    }
-
-    function setProgress(step) {
-        $('progress-steps').style.display = 'flex';
-        ['chunk','audio','done'].forEach(s => $('step-' + s).className = 'progress-step');
-        if (step === 'chunk') $('step-chunk').classList.add('active');
-        else if (step === 'audio') { $('step-chunk').classList.add('done'); $('step-audio').classList.add('active'); }
-        else if (step === 'done') { $('step-chunk').classList.add('done'); $('step-audio').classList.add('done'); $('step-done').classList.add('active'); }
-    }
-
-    // ================================================================
-    // PIPELINE TIMING & PROGRESS BAR
-    // ================================================================
-    const TIMING_KEY = 'lingoreader-timing';
-    let pipelineTimerRAF = null;
-    let pipelineStartTime = 0;
-    let currentStepKey = null;
-
-    function loadTimingHistory() {
-        try { return JSON.parse(localStorage.getItem(TIMING_KEY)) || {}; } catch { return {}; }
-    }
-
-    function saveTimingEntry(stepKey, durationMs) {
-        const hist = loadTimingHistory();
-        if (!hist[stepKey]) hist[stepKey] = [];
-        hist[stepKey].push(durationMs);
-        if (hist[stepKey].length > 5) hist[stepKey] = hist[stepKey].slice(-5);
-        localStorage.setItem(TIMING_KEY, JSON.stringify(hist));
-    }
-
-    function getAverageMs(stepKey) {
-        const hist = loadTimingHistory();
-        const arr = hist[stepKey];
-        if (!arr || !arr.length) return 0;
-        return arr.reduce((a, b) => a + b, 0) / arr.length;
-    }
-
-    function formatTime(ms) {
-        const s = Math.floor(ms / 1000);
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
-    }
-
-    function startPipelineTimer(stepKey) {
-        currentStepKey = stepKey;
-        pipelineStartTime = Date.now();
-        const avgMs = getAverageMs(stepKey);
-        $('progress-bar-wrap').style.display = 'block';
-        $('progress-timer').style.display = 'block';
-        $('progress-bar-fill').style.width = '0%';
-
-        function tick() {
-            const elapsed = Date.now() - pipelineStartTime;
-            let timerText = formatTime(elapsed);
-            if (avgMs > 0) {
-                const pct = Math.min((elapsed / avgMs) * 100, 95);
-                $('progress-bar-fill').style.width = pct + '%';
-                timerText += ` / ~${formatTime(avgMs)} avg`;
-            } else {
-                // No history — show indeterminate-style slow fill
-                const pct = Math.min((elapsed / 120000) * 50, 50);
-                $('progress-bar-fill').style.width = pct + '%';
-            }
-            $('progress-timer').textContent = timerText;
-            pipelineTimerRAF = requestAnimationFrame(tick);
-        }
-        pipelineTimerRAF = requestAnimationFrame(tick);
-    }
-
-    function stopPipelineTimer() {
-        if (pipelineTimerRAF) { cancelAnimationFrame(pipelineTimerRAF); pipelineTimerRAF = null; }
-        const elapsed = Date.now() - pipelineStartTime;
-        if (currentStepKey && elapsed > 0) saveTimingEntry(currentStepKey, elapsed);
-        $('progress-bar-fill').style.width = '100%';
-        const stepKey = currentStepKey;
-        currentStepKey = null;
-        return elapsed;
-    }
-
-    function resetPipelineUI() {
-        if (pipelineTimerRAF) { cancelAnimationFrame(pipelineTimerRAF); pipelineTimerRAF = null; }
-        $('progress-bar-wrap').style.display = 'none';
-        $('progress-timer').style.display = 'none';
-        $('progress-bar-fill').style.width = '0%';
-    }
 
     function extractTextFromHtml(html) {
         const div = document.createElement('div');
         div.innerHTML = html;
         return div.textContent || div.innerText || '';
     }
-
-    // ================================================================
-    // GENERATE PIPELINE
-    // ================================================================
-    $('btn-generate').addEventListener('click', async () => {
-        let sourceText = '';
-        let tiptapData = null;
-        let readerData = null;
-        let needsChunking = true;
-
-        if (activeTab === 'plain') {
-            sourceText = $('plainTextInput').value.trim();
-            if (!sourceText) { setStatus('Please enter some French text.', 'error'); return; }
-
-        } else if (activeTab === 'editor') {
-            if (!editorHtml || !editorHtml.trim()) { setStatus('Please write something in the editor.', 'error'); return; }
-            tiptapData = { html: editorHtml, json: editorJson };
-            sourceText = extractTextFromHtml(editorHtml);
-            if (!sourceText.trim()) { setStatus('Could not extract text from editor content.', 'error'); return; }
-
-        } else if (activeTab === 'lectos') {
-            setStatus('Switch to Rich Editor, Plain Text, or Paste JSON tab to generate.', 'error');
-            return;
-
-        } else if (activeTab === 'json') {
-            const raw = $('jsonInput').value.trim();
-            if (!raw) { setStatus('Please paste Reader JSON.', 'error'); return; }
-            try {
-                readerData = JSON.parse(raw);
-                if (!readerData.source_language || !readerData.chunks || !readerData.chunks.length) throw new Error('Missing source_language or chunks.');
-                needsChunking = false;
-                sourceText = readerData.chunks.map(c => c.source).join('');
-            } catch (e) { setStatus('Invalid Reader JSON: ' + e.message, 'error'); return; }
-            const tiptapRaw = $('jsonTiptapInput').value.trim();
-            if (tiptapRaw) {
-                try { tiptapData = JSON.parse(tiptapRaw); if (!tiptapData.html) throw new Error("Must include 'html'."); }
-                catch (e) { setStatus('Invalid TipTap JSON: ' + e.message, 'error'); return; }
-            }
-        }
-
-        const voiceId = $('voiceId').value.trim();
-        if (!voiceId) { setStatus('Voice ID is required.', 'error'); return; }
-
-        const pw = $('auth-password').value.trim();
-        if (!pw) { setStatus('Password is required.', 'error'); return; }
-        setAuthToken(pw);
-
-        $('btn-generate').disabled = true;
-
-        try {
-            if (needsChunking) {
-                setStatus('Sending text to OpenAI for chunking & translation…', 'loading');
-                setProgress('chunk');
-                startPipelineTimer('chunk');
-
-                // Start async job
-                const startRes = await authedFetch('/api/chunk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceText }) });
-                if (!startRes.ok) { const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` })); throw new Error(err.error || `Chunk start failed: ${startRes.status}`); }
-                const { jobId } = await startRes.json();
-
-                // Poll for result
-                readerData = await new Promise((resolve, reject) => {
-                    const poll = async () => {
-                        try {
-                            const pollRes = await fetch('/api/chunk/' + jobId);
-                            if (!pollRes.ok) {
-                                let errMsg = `Chunk poll failed: HTTP ${pollRes.status}`;
-                                try { const errData = await pollRes.json(); errMsg = errData.error || errMsg; } catch(_) { try { errMsg += ' - ' + await pollRes.text(); } catch(_2){} }
-                                reject(new Error(errMsg)); return;
-                            }
-                            const data = await pollRes.json();
-                            if (data.status === 'processing') { setTimeout(poll, 2000); return; }
-                            if (data.status === 'error') { reject(new Error(data.error || 'Chunking failed')); return; }
-                            if (data.usage) {
-                                const u = data.usage;
-                                console.log('OpenAI usage:', u);
-                                setStatus(`Chunking done — ${u.input_tokens?.toLocaleString() || '?'} input / ${u.output_tokens?.toLocaleString() || '?'} output tokens`, 'success');
-                            }
-                            resolve(data.result);
-                        } catch (e) { reject(new Error('Chunk poll error: ' + (e.message || e))); }
-                    };
-                    poll();
-                });
-
-                stopPipelineTimer();
-                if (!readerData.chunks || !readerData.chunks.length) throw new Error('OpenAI returned no chunks.');
-                sourceText = readerData.chunks.map(c => c.source).join('');
-            }
-
-            setStatus('Generating audio with ElevenLabs…', 'loading');
-            setProgress('audio');
-            startPipelineTimer('audio');
-            const audioRes = await authedFetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voiceId, text: sourceText, stability: parseFloat(stabilityEl.value), similarity_boost: parseFloat(similarityEl.value), style: parseFloat(styleEl.value), use_speaker_boost: $('use_speaker_boost').checked }) });
-            if (!audioRes.ok) { const err = await audioRes.json().catch(() => ({ error: `HTTP ${audioRes.status}` })); throw new Error(err.error || `ElevenLabs failed: ${audioRes.status}`); }
-            const audioData = await audioRes.json();
-            stopPipelineTimer();
-            const charCount = sourceText.length;
-            setStatus(`Audio done — ${charCount.toLocaleString()} characters sent to ElevenLabs`, 'success');
-
-            setProgress('done');
-            resetPipelineUI();
-            state.readerData = readerData; state.alignmentData = audioData.alignment || null; state.tiptapData = tiptapData; state.audioBase64 = audioData.audio_base64 || null; state.audioUrl = null; state.tappedIds = new Set(); state.tapCount = 0;
-            saveState();
-            showReaderView();
-        } catch (err) { console.error('Pipeline error:', err); resetPipelineUI(); setStatus(err.message || 'Something went wrong.', 'error'); }
-        finally { $('btn-generate').disabled = false; }
-    });
 
     // ================================================================
     // VIEW SWITCHING
@@ -965,7 +591,188 @@
             tab.classList.add('active');
             $('rpanel-' + tab.dataset.rtab).classList.add('active');
             if (tab.dataset.rtab === 'data') populateDataPanel();
+            if (tab.dataset.rtab === 'edit') initEditPanel();
         });
+    });
+
+    // ================================================================
+    // EDIT PANEL
+    // ================================================================
+    let editEditorReady = false;
+    let editEditorJson = null;
+    let editEditorHtml = '';
+
+    function initEditPanel() {
+        const iframe = $('editTiptapFrame');
+        if (!editEditorReady) {
+            // First time: build editor iframe
+            const editorHTML = buildEditorHTML();
+            const blob = new Blob([editorHTML], { type: 'text/html' });
+            iframe.src = URL.createObjectURL(blob);
+            editEditorReady = true;
+
+            // Listen for messages from the edit editor iframe
+            window.addEventListener('message', (e) => {
+                if (!e.data || typeof e.data !== 'object') return;
+                if (e.source !== iframe.contentWindow) return;
+                if (e.data.type === 'content-changed') {
+                    editEditorJson = e.data.detail.json;
+                    editEditorHtml = e.data.detail.html;
+                } else if (e.data.type === 'ready') {
+                    // Load current Lecto content into the editor
+                    loadCurrentLectoIntoEditEditor();
+                }
+            });
+        } else {
+            // Already initialized, reload current content
+            loadCurrentLectoIntoEditEditor();
+        }
+
+        // Pre-fill password from stored auth
+        const pw = getAuthToken();
+        if (pw) $('edit-password').value = pw;
+    }
+
+    function loadCurrentLectoIntoEditEditor() {
+        const iframe = $('editTiptapFrame');
+        if (!iframe || !iframe.contentWindow) return;
+        // Prefer tiptapData.json, fall back to tiptapData.html, fall back to generating from chunks
+        if (state.tiptapData && state.tiptapData.json) {
+            iframe.contentWindow.postMessage({ type: 'set-content', json: state.tiptapData.json }, '*');
+        } else if (state.tiptapData && state.tiptapData.html) {
+            iframe.contentWindow.postMessage({ type: 'set-content', html: state.tiptapData.html }, '*');
+        } else if (state.readerData && state.readerData.chunks) {
+            // Build HTML from chunks as fallback
+            const html = '<p>' + state.readerData.chunks.map(c => c.source).join('').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+            iframe.contentWindow.postMessage({ type: 'set-content', html: html }, '*');
+        }
+    }
+
+    // Apply JSON button in edit panel
+    $('btn-edit-apply-json').addEventListener('click', () => {
+        const raw = $('editJsonViewerText').value.trim();
+        if (!raw) return;
+        try {
+            const json = JSON.parse(raw);
+            const iframe = $('editTiptapFrame');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({ type: 'set-content', json }, '*');
+            }
+        } catch (e) { alert('Invalid JSON: ' + e.message); }
+    });
+
+    // Regenerate button
+    $('btn-edit-regenerate').addEventListener('click', async () => {
+        if (!editEditorHtml || !editEditorHtml.trim()) {
+            $('edit-status').textContent = 'Please write something in the editor.';
+            $('edit-status').className = 'status-msg error';
+            return;
+        }
+
+        const pw = $('edit-password').value.trim();
+        if (!pw) {
+            $('edit-status').textContent = 'Password is required.';
+            $('edit-status').className = 'status-msg error';
+            return;
+        }
+        setAuthToken(pw);
+
+        const sourceText = extractTextFromHtml(editEditorHtml);
+        if (!sourceText.trim()) {
+            $('edit-status').textContent = 'Could not extract text from editor content.';
+            $('edit-status').className = 'status-msg error';
+            return;
+        }
+
+        const tiptapData = { html: editEditorHtml, json: editEditorJson };
+        const btn = $('btn-edit-regenerate');
+        const status = $('edit-status');
+        btn.disabled = true;
+
+        try {
+            // Step 1: Chunk
+            status.textContent = 'Sending text to OpenAI for chunking & translation…';
+            status.className = 'status-msg loading';
+            const startRes = await authedFetch('/api/chunk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sourceText })
+            });
+            if (!startRes.ok) {
+                const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` }));
+                throw new Error(err.error || `Chunk start failed: ${startRes.status}`);
+            }
+            const { jobId } = await startRes.json();
+
+            const readerData = await new Promise((resolve, reject) => {
+                const poll = async () => {
+                    try {
+                        const pollRes = await fetch('/api/chunk/' + jobId);
+                        if (!pollRes.ok) {
+                            let errMsg = `Chunk poll failed: HTTP ${pollRes.status}`;
+                            try { const errData = await pollRes.json(); errMsg = errData.error || errMsg; } catch(_) {}
+                            reject(new Error(errMsg)); return;
+                        }
+                        const data = await pollRes.json();
+                        if (data.status === 'processing') { setTimeout(poll, 2000); return; }
+                        if (data.status === 'error') { reject(new Error(data.error || 'Chunking failed')); return; }
+                        resolve(data.result);
+                    } catch (e) { reject(new Error('Chunk poll error: ' + (e.message || e))); }
+                };
+                poll();
+            });
+
+            if (!readerData.chunks || !readerData.chunks.length) throw new Error('OpenAI returned no chunks.');
+            const newSourceText = readerData.chunks.map(c => c.source).join('');
+
+            // Step 2: Audio
+            status.textContent = 'Generating audio with ElevenLabs…';
+            status.className = 'status-msg loading';
+            const voiceId = $('voiceId').value.trim() || $('data-voiceId').value.trim() || 'JBFqnCBsd6RMkjVDRZzb';
+            const audioRes = await authedFetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    voiceId,
+                    text: newSourceText,
+                    stability: parseFloat($('stability').value),
+                    similarity_boost: parseFloat($('similarity_boost').value),
+                    style: parseFloat($('style').value),
+                    use_speaker_boost: $('use_speaker_boost').checked
+                })
+            });
+            if (!audioRes.ok) {
+                const err = await audioRes.json().catch(() => ({ error: `HTTP ${audioRes.status}` }));
+                throw new Error(err.error || 'ElevenLabs failed');
+            }
+            const audioData = await audioRes.json();
+
+            // Update state
+            state.readerData = readerData;
+            state.alignmentData = audioData.alignment || null;
+            state.tiptapData = tiptapData;
+            state.audioBase64 = audioData.audio_base64 || null;
+            state.audioUrl = null;
+            state.tappedIds = new Set();
+            state.tapCount = 0;
+            saveState();
+
+            status.textContent = `Lecto regenerated — ${newSourceText.length.toLocaleString()} characters`;
+            status.className = 'status-msg success';
+
+            // Switch to Reader tab and re-render
+            document.querySelectorAll('.reader-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.reader-panel').forEach(p => p.classList.remove('active'));
+            document.querySelector('[data-rtab="reader"]').classList.add('active');
+            $('rpanel-reader').classList.add('active');
+            renderReader();
+
+        } catch (e) {
+            status.textContent = 'Error: ' + e.message;
+            status.className = 'status-msg error';
+        } finally {
+            btn.disabled = false;
+        }
     });
 
     function populateDataPanel() {
@@ -1259,31 +1066,65 @@
         const starts = state.alignmentData.character_start_times_seconds;
         const ends = state.alignmentData.character_end_times_seconds;
 
-        // Normalize a character for fuzzy matching (lowercase, strip diacritics for punctuation)
+        // --- Step 0: Interpolate plateau regions in alignment data ---
+        // ElevenLabs sometimes assigns identical timestamps to large runs of characters.
+        // Detect these plateaus and interpolate between the boundaries.
+        const iStarts = starts.slice(); // mutable copies
+        const iEnds = ends.slice();
+        let plateauCount = 0;
+        for (let i = 0; i < iStarts.length; ) {
+            // Find run of chars with identical start time
+            const t = iStarts[i];
+            let j = i + 1;
+            while (j < iStarts.length && iStarts[j] === t && iEnds[j] === iEnds[i]) j++;
+            const runLen = j - i;
+            if (runLen >= 5) { // only interpolate runs of 5+ chars
+                // Find boundary times: previous char's end (or same time) and next char's start (or same time)
+                const prevEnd = i > 0 ? iEnds[i - 1] : t;
+                // Look ahead for the first char that has a DIFFERENT start time
+                let nextStart = iEnds[j - 1]; // fallback: use end of last char in run
+                for (let k = j; k < iStarts.length; k++) {
+                    if (iStarts[k] !== t) { nextStart = iStarts[k]; break; }
+                }
+                // Use the later of prevEnd and t as the range start
+                const rangeStart = Math.max(prevEnd, t);
+                const rangeEnd = nextStart;
+                if (rangeEnd > rangeStart) {
+                    const step = (rangeEnd - rangeStart) / runLen;
+                    for (let k = 0; k < runLen; k++) {
+                        iStarts[i + k] = rangeStart + k * step;
+                        iEnds[i + k] = rangeStart + (k + 1) * step;
+                    }
+                    plateauCount++;
+                    diag('[ALIGN PLATEAU] interpolated ' + runLen + ' chars at index ' + i +
+                        ', range ' + rangeStart.toFixed(3) + '-' + rangeEnd.toFixed(3));
+                }
+            }
+            i = j;
+        }
+        if (plateauCount > 0) diag('[ALIGN] Interpolated ' + plateauCount + ' plateau regions');
+
+        // Normalize a character for fuzzy matching
         const norm = ch => {
-            // Treat various quotes/guillemets as equivalent
             if ('«»""„‟‹›'.includes(ch)) return '"';
             if ("''ʼ`´".includes(ch)) return "'";
             if ('–—―'.includes(ch)) return '-';
             if ('…'.includes(ch)) return '.';
             return ch.toLowerCase();
         };
-        const isSkippable = ch => /^[«»""„‟‹›\u00AB\u00BB]$/.test(ch);
 
-        // Two-pointer alignment: compare characters, skip source-only punctuation
-        // Track all matched alignment indices per chunk to detect internal gaps
+        // --- Step 1: Two-pointer character matching ---
         let ai = 0;
         const mismatches = [];
-        const chunkAlignIndices = []; // array of arrays
+        const chunkAlignIndices = [];
         state.readerData.chunks.forEach(c => {
             const src = c.source;
-            const indices = []; // alignment indices for this chunk
+            const indices = [];
             for (let si = 0; si < src.length; si++) {
                 const sc = src[si];
                 if (sc.trim() === '') continue;
                 while (ai < chars.length && chars[ai].trim() === '') ai++;
                 if (ai >= chars.length) break;
-
                 const ac = chars[ai];
                 if (norm(sc) === norm(ac)) {
                     indices.push(ai);
@@ -1293,80 +1134,82 @@
                 }
             }
             chunkAlignIndices.push(indices);
+        });
 
-            if (indices.length > 0) {
-                c.audioStart = starts[indices[0]];
-                // Find audioEnd: use last character's end, but detect internal gaps > 2s
-                // If a gap is found, the real spoken content ended before the gap
-                let realEndIdx = indices[0];
-                for (let k = 1; k < indices.length; k++) {
-                    const prev = indices[k - 1];
-                    const cur = indices[k];
-                    // Check for a gap: if start of current char is > 2s after end of previous char
-                    if (starts[cur] - ends[prev] > 2.0) {
-                        break; // stop — content after this gap belongs to a different audio section
-                    }
-                    realEndIdx = cur;
-                }
-                c.audioEnd = ends[realEndIdx];
-            } else {
+        // --- Step 2: Assign audio ranges with gap detection (use LARGER segment) ---
+        state.readerData.chunks.forEach((c, ci) => {
+            const indices = chunkAlignIndices[ci];
+            if (!indices || indices.length === 0) {
                 c.audioStart = null;
                 c.audioEnd = null;
+                return;
+            }
+
+            // Detect internal gaps > 2s and split into segments
+            const segments = []; // each segment: {startK, endK} (indices into the indices array)
+            let segStart = 0;
+            for (let k = 1; k < indices.length; k++) {
+                const prev = indices[k - 1];
+                const cur = indices[k];
+                if (iStarts[cur] - iEnds[prev] > 2.0) {
+                    segments.push({startK: segStart, endK: k - 1});
+                    segStart = k;
+                }
+            }
+            segments.push({startK: segStart, endK: indices.length - 1});
+
+            if (segments.length === 1) {
+                // No gap — use full range
+                c.audioStart = iStarts[indices[0]];
+                c.audioEnd = iEnds[indices[indices.length - 1]];
+            } else {
+                // Pick the segment with the MOST characters
+                let bestSeg = segments[0];
+                for (let s = 1; s < segments.length; s++) {
+                    const segLen = segments[s].endK - segments[s].startK + 1;
+                    const bestLen = bestSeg.endK - bestSeg.startK + 1;
+                    if (segLen > bestLen) bestSeg = segments[s];
+                }
+                c.audioStart = iStarts[indices[bestSeg.startK]];
+                c.audioEnd = iEnds[indices[bestSeg.endK]];
+                diag('[ALIGN GAP] ' + c.id + ' has ' + segments.length + ' segments, using segment with ' +
+                    (bestSeg.endK - bestSeg.startK + 1) + ' chars: ' +
+                    c.audioStart.toFixed(3) + '-' + c.audioEnd.toFixed(3));
             }
         });
 
-        // Post-process: for chunks where gap detection truncated the audio,
-        // the remaining characters are after a long gap — re-map them using
-        // the characters AFTER the gap as the true audio range.
+        // --- Step 3: Fix zero-duration chunks by interpolating from neighbors ---
         const chunks = state.readerData.chunks;
         for (let ci = 0; ci < chunks.length; ci++) {
             const c = chunks[ci];
-            const indices = chunkAlignIndices[ci];
-            if (!indices || indices.length < 2) continue;
-
-            // Find where the gap was detected
-            let gapAt = -1;
-            for (let k = 1; k < indices.length; k++) {
-                if (starts[indices[k]] - ends[indices[k-1]] > 2.0) {
-                    gapAt = k;
+            if (c.audioStart === null) continue;
+            if (c.audioStart !== c.audioEnd) continue;
+            // Zero-duration chunk: interpolate between previous end and next start
+            const prevEnd = ci > 0 && chunks[ci-1].audioEnd !== null ? chunks[ci-1].audioEnd : c.audioStart;
+            let nextStart = c.audioEnd;
+            for (let ni = ci + 1; ni < chunks.length; ni++) {
+                if (chunks[ni].audioStart !== null && chunks[ni].audioStart !== chunks[ni].audioEnd) {
+                    nextStart = chunks[ni].audioStart;
                     break;
                 }
             }
-            if (gapAt < 0) continue; // no gap in this chunk
-
-            // This chunk has a gap. The first part (before gap) is c's audio.
-            // The remaining characters (after gap) should be assigned to
-            // subsequent chunks that currently have zero-duration or wrong times.
-            const postGapStart = starts[indices[gapAt]];
-            const postGapEnd = ends[indices[indices.length - 1]];
-            diag('[ALIGN GAP] ' + c.id + ' gap at char ' + gapAt + '/' + indices.length +
-                '. Pre-gap audio: ' + c.audioStart.toFixed(3) + '-' + c.audioEnd.toFixed(3) +
-                '. Post-gap audio: ' + postGapStart.toFixed(3) + '-' + postGapEnd.toFixed(3));
-
-            // Re-distribute post-gap characters to this chunk and following chunks.
-            // Split: characters before gap stay with this chunk (already done).
-            // Characters after gap: assign proportionally to this chunk's remaining
-            // chars and subsequent chunks, based on their character positions.
-            // Simple approach: assign all post-gap indices to subsequent chunks
-            // starting from the chunk AFTER this one.
-            const postGapIndices = indices.slice(gapAt);
-            let pgi = 0; // pointer into postGapIndices
-            for (let ni = ci + 1; ni < chunks.length && pgi < postGapIndices.length; ni++) {
-                const nc = chunks[ni];
-                const nIndices = chunkAlignIndices[ni];
-                if (!nIndices || nIndices.length === 0) continue;
-
-                // Count how many of this chunk's alignment indices fall in the post-gap range
-                const chunkPostGapCount = nIndices.filter(idx => idx >= indices[gapAt]).length;
-                if (chunkPostGapCount === 0) continue;
-
-                // Assign audio range from the post-gap characters for this chunk
-                const startIdx = postGapIndices[pgi];
-                const endPgi = Math.min(pgi + chunkPostGapCount - 1, postGapIndices.length - 1);
-                const endIdx = postGapIndices[endPgi];
-                nc.audioStart = starts[startIdx];
-                nc.audioEnd = ends[endIdx];
-                pgi += chunkPostGapCount;
+            if (nextStart > prevEnd) {
+                // Count consecutive zero-dur chunks to split evenly
+                let zeroRun = 0;
+                let zeroStart = ci;
+                while (zeroStart + zeroRun < chunks.length &&
+                       chunks[zeroStart + zeroRun].audioStart !== null &&
+                       chunks[zeroStart + zeroRun].audioStart === chunks[zeroStart + zeroRun].audioEnd) {
+                    zeroRun++;
+                }
+                const step = (nextStart - prevEnd) / zeroRun;
+                for (let k = 0; k < zeroRun; k++) {
+                    chunks[zeroStart + k].audioStart = prevEnd + k * step;
+                    chunks[zeroStart + k].audioEnd = prevEnd + (k + 1) * step;
+                }
+                diag('[ALIGN ZERO-DUR] interpolated ' + zeroRun + ' chunks from ' +
+                    prevEnd.toFixed(3) + ' to ' + nextStart.toFixed(3));
+                ci = zeroStart + zeroRun - 1; // skip past the run
             }
         }
 
@@ -1892,7 +1735,6 @@ document.getElementById('editor').addEventListener('scroll',function(){if(rsWrap
     // ================================================================
     // INIT
     // ================================================================
-    initEditorIframe();
     loadLectos();
     </script>
 </body>
