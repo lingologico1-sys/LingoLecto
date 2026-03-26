@@ -464,6 +464,7 @@
     let activeChunkEl = null;
     let currentAudioChunkId = null;
     let tapResumeTime = null; // when a chunk is tapped, store its audioStart so play resumes there
+    let navLock = false; // when true, update() is suppressed to prevent timeupdate from overriding arrow/click navigation
     let syncRAF = null;
 
     // Editor state
@@ -1280,14 +1281,12 @@
         };
 
         const update = () => {
+            if (navLock) { console.log('[update] blocked by navLock, t=' + audio.currentTime.toFixed(4)); return; }
             const t = audio.currentTime; let aid = null; let fallback = null;
             for (const c of state.readerData.chunks) {
                 if (c.audioStart === null || c.audioEnd === null) continue;
-                // Use exclusive end so boundary times belong to the NEXT chunk
                 if (t >= c.audioStart && t < c.audioEnd) { aid = c.id; break; }
-                // Exact end match (for the very last moment of a chunk)
                 if (!aid && t === c.audioEnd) { fallback = c.id; }
-                // Small tolerance after audioEnd to bridge gaps
                 if (!fallback && t >= c.audioStart && t < c.audioEnd + 0.1) fallback = c.id;
             }
             if (!aid) aid = fallback;
@@ -1295,6 +1294,7 @@
         };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
         audio.addEventListener('play', () => {
+            navLock = false; // Release lock when playback starts
             autoScroll = true;
             if (tapResumeTime !== null) {
                 audio.currentTime = tapResumeTime; tapResumeTime = null;
@@ -1348,38 +1348,43 @@
                 case 'ArrowLeft':
                     e.preventDefault();
                     if (!audio.paused) audio.pause();
+                    navLock = true;
                     {
                         let curPos = validIndices.indexOf(navIdx);
-                        // If navIdx not in validIndices, find nearest valid at or before navIdx
                         if (curPos < 0) {
                             for (let i = validIndices.length - 1; i >= 0; i--) {
                                 if (validIndices[i] <= navIdx) { curPos = i; break; }
                             }
                         }
+                        const oldNavIdx = navIdx;
                         const newPos = curPos > 0 ? curPos - 1 : 0;
                         navIdx = validIndices[newPos];
                         audio.currentTime = chunks[navIdx].audioStart;
                         highlightChunkAt(navIdx);
+                        console.log('[NAV ←]', {from: oldNavIdx, fromChunk: oldNavIdx >= 0 ? chunks[oldNavIdx].id : null, curPos, newPos, to: navIdx, toChunk: chunks[navIdx].id, audioTime: chunks[navIdx].audioStart, actualTime: audio.currentTime});
                     }
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
                     if (!audio.paused) audio.pause();
+                    navLock = true;
                     {
                         let curPos = validIndices.indexOf(navIdx);
-                        // If navIdx not in validIndices, find nearest valid at or before navIdx
                         if (curPos < 0) {
                             for (let i = validIndices.length - 1; i >= 0; i--) {
                                 if (validIndices[i] <= navIdx) { curPos = i; break; }
                             }
-                            // If still -1, start from beginning
                             if (curPos < 0) curPos = -1;
                         }
+                        const oldNavIdx = navIdx;
                         const newPos = curPos + 1;
                         if (newPos < validIndices.length) {
                             navIdx = validIndices[newPos];
                             audio.currentTime = chunks[navIdx].audioStart;
                             highlightChunkAt(navIdx);
+                            console.log('[NAV →]', {from: oldNavIdx, fromChunk: oldNavIdx >= 0 ? chunks[oldNavIdx].id : null, curPos, newPos, to: navIdx, toChunk: chunks[navIdx].id, audioTime: chunks[navIdx].audioStart, actualTime: audio.currentTime});
+                        } else {
+                            console.log('[NAV →] at end', {navIdx, curPos, newPos, validLen: validIndices.length});
                         }
                     }
                     break;
@@ -1436,8 +1441,10 @@
         if (aud) {
             if (!aud.paused) aud.pause();
             if (chunk.audioStart !== null && chunk.audioStart !== undefined) {
+                navLock = true;
                 aud.currentTime = chunk.audioStart;
-                tapResumeTime = null; // no deferred seek needed, we set it directly
+                tapResumeTime = null;
+                console.log('[TAP]', {chunk: chunk.id, audioStart: chunk.audioStart, actualTime: aud.currentTime});
             }
         }
         // Clear active-audio highlight from previous chunk
