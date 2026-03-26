@@ -465,6 +465,8 @@
     let currentAudioChunkId = null;
     let tapResumeTime = null; // when a chunk is tapped, store its audioStart so play resumes there
     let navLock = false; // when true, update() is suppressed to prevent timeupdate from overriding arrow/click navigation
+    const diagLog = []; // diagnostic log entries
+    function diag(msg, data) { const ts = new Date().toISOString().slice(11,23); const entry = ts + ' ' + msg + (data ? ' ' + JSON.stringify(data) : ''); diagLog.push(entry); console.log(entry); const el = document.getElementById('diag-content'); if (el) el.textContent = diagLog.join('\n'); }
     let syncRAF = null;
 
     // Editor state
@@ -934,7 +936,7 @@
 
         const ac = $('audio-container');
         const audioSrc = state.audioUrl || (state.audioBase64 ? 'data:audio/mpeg;base64,' + state.audioBase64 : null);
-        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div><div class="kbd-legend"><span><kbd>Space</kbd> / <kbd>↓</kbd> Play/Pause</span><span><kbd>←</kbd> Prev Chunk</span><span><kbd>→</kbd> Next Chunk</span><span><kbd>↑</kbd> Show Translation</span></div>` : '';
+        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div><div class="kbd-legend"><span><kbd>Space</kbd> / <kbd>↓</kbd> Play/Pause</span><span><kbd>←</kbd> Prev Chunk</span><span><kbd>→</kbd> Next Chunk</span><span><kbd>↑</kbd> Show Translation</span></div><details id="diag-panel" style="margin-top:12px;font-size:12px;"><summary style="cursor:pointer;color:#888;user-select:none;">Diagnostics</summary><pre id="diag-content" style="max-height:200px;overflow:auto;background:#f5f5f5;padding:8px;border-radius:4px;font-size:11px;white-space:pre-wrap;margin:6px 0;"></pre><button id="diag-copy" style="font-size:11px;padding:2px 10px;cursor:pointer;">Copy to clipboard</button><button id="diag-clear" style="font-size:11px;padding:2px 10px;cursor:pointer;margin-left:4px;">Clear</button></details>` : '';
 
         const rt = $('reader-text');
         const useTiptap = state.tiptapData && state.tiptapData.html;
@@ -947,6 +949,10 @@
         rt.addEventListener('click', (e) => { e.stopPropagation(); const t = e.target.closest('.chunk'); if (!t) { hideTooltip(); return; } const c = chunkMap.get(t.getAttribute('data-id')); if (c) showTooltip(t, c); });
         langSelect.addEventListener('change', () => { if (activeChunkEl) { const c = chunkMap.get(activeChunkEl.getAttribute('data-id')); if (c) showTooltip(activeChunkEl, c); } });
         if ((state.audioBase64 || state.audioUrl) && state.alignmentData) setupAudioSync();
+        const diagCopy = document.getElementById('diag-copy');
+        if (diagCopy) diagCopy.addEventListener('click', () => { navigator.clipboard.writeText(diagLog.join('\n')).then(() => { diagCopy.textContent = 'Copied!'; setTimeout(() => { diagCopy.textContent = 'Copy to clipboard'; }, 1500); }); });
+        const diagClear = document.getElementById('diag-clear');
+        if (diagClear) diagClear.addEventListener('click', () => { diagLog.length = 0; const el = document.getElementById('diag-content'); if (el) el.textContent = ''; });
     }
 
     // ================================================================
@@ -1281,7 +1287,7 @@
         };
 
         const update = () => {
-            if (navLock) { console.log('[update] blocked by navLock, t=' + audio.currentTime.toFixed(4)); return; }
+            if (navLock) { diag('[update] blocked by navLock', {t: audio.currentTime.toFixed(4)}); return; }
             const t = audio.currentTime; let aid = null; let fallback = null;
             for (const c of state.readerData.chunks) {
                 if (c.audioStart === null || c.audioEnd === null) continue;
@@ -1290,17 +1296,18 @@
                 if (!fallback && t >= c.audioStart && t < c.audioEnd + 0.1) fallback = c.id;
             }
             if (!aid) aid = fallback;
-            if (aid !== currentAudioChunkId) { if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); syncNavIdx(); }
+            if (aid !== currentAudioChunkId) { diag('[update] chunk change', {t: t.toFixed(4), from: currentAudioChunkId, to: aid, usedFallback: !!(aid && aid === fallback)}); if (currentAudioChunkId) document.querySelectorAll(`.chunk[data-id="${currentAudioChunkId}"]`).forEach(el => el.classList.remove('active-audio')); if (aid) document.querySelectorAll(`.chunk[data-id="${aid}"]`).forEach(el => el.classList.add('active-audio')); currentAudioChunkId = aid; scrollToChunk(aid); syncNavIdx(); }
         };
         const loop = () => { if (!audio.paused) { update(); syncRAF = requestAnimationFrame(loop); } };
         audio.addEventListener('play', () => {
-            navLock = false; // Release lock when playback starts
+            diag('[PLAY]', {t: audio.currentTime.toFixed(4), navIdx, navLock});
+            navLock = false;
             autoScroll = true;
             if (tapResumeTime !== null) {
                 audio.currentTime = tapResumeTime; tapResumeTime = null;
             }
             hideTooltip(); audio.blur(); syncRAF = requestAnimationFrame(loop);
-        }); audio.addEventListener('pause', () => { cancelAnimationFrame(syncRAF); audio.blur(); }); audio.addEventListener('seeked', () => { autoScroll = true; audio.blur(); }); audio.addEventListener('timeupdate', update);
+        }); audio.addEventListener('pause', () => { diag('[PAUSE]', {t: audio.currentTime.toFixed(4), navIdx}); cancelAnimationFrame(syncRAF); audio.blur(); }); audio.addEventListener('seeked', () => { autoScroll = true; audio.blur(); }); audio.addEventListener('timeupdate', update);
 
         const chunks = state.readerData.chunks;
 
@@ -1361,7 +1368,7 @@
                         navIdx = validIndices[newPos];
                         audio.currentTime = chunks[navIdx].audioStart;
                         highlightChunkAt(navIdx);
-                        console.log('[NAV ←]', {from: oldNavIdx, fromChunk: oldNavIdx >= 0 ? chunks[oldNavIdx].id : null, curPos, newPos, to: navIdx, toChunk: chunks[navIdx].id, audioTime: chunks[navIdx].audioStart, actualTime: audio.currentTime});
+                        diag('[NAV ←]', {from: oldNavIdx, fromChunk: oldNavIdx >= 0 ? chunks[oldNavIdx].id : null, curPos, newPos, to: navIdx, toChunk: chunks[navIdx].id, audioTime: chunks[navIdx].audioStart, actualTime: audio.currentTime});
                     }
                     break;
                 case 'ArrowRight':
@@ -1382,9 +1389,9 @@
                             navIdx = validIndices[newPos];
                             audio.currentTime = chunks[navIdx].audioStart;
                             highlightChunkAt(navIdx);
-                            console.log('[NAV →]', {from: oldNavIdx, fromChunk: oldNavIdx >= 0 ? chunks[oldNavIdx].id : null, curPos, newPos, to: navIdx, toChunk: chunks[navIdx].id, audioTime: chunks[navIdx].audioStart, actualTime: audio.currentTime});
+                            diag('[NAV →]', {from: oldNavIdx, fromChunk: oldNavIdx >= 0 ? chunks[oldNavIdx].id : null, curPos, newPos, to: navIdx, toChunk: chunks[navIdx].id, audioTime: chunks[navIdx].audioStart, actualTime: audio.currentTime});
                         } else {
-                            console.log('[NAV →] at end', {navIdx, curPos, newPos, validLen: validIndices.length});
+                            diag('[NAV →] at end', {navIdx, curPos, newPos, validLen: validIndices.length});
                         }
                     }
                     break;
@@ -1444,7 +1451,7 @@
                 navLock = true;
                 aud.currentTime = chunk.audioStart;
                 tapResumeTime = null;
-                console.log('[TAP]', {chunk: chunk.id, audioStart: chunk.audioStart, actualTime: aud.currentTime});
+                diag('[TAP]', {chunk: chunk.id, audioStart: chunk.audioStart, actualTime: aud.currentTime});
             }
         }
         // Clear active-audio highlight from previous chunk
