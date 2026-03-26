@@ -1255,8 +1255,33 @@
 
     function mapAudioTimestamps() {
         if (!state.readerData || !state.alignmentData || !state.alignmentData.characters) return;
-        const chars = state.alignmentData.characters; const starts = state.alignmentData.character_start_times_seconds; const ends = state.alignmentData.character_end_times_seconds; let ci = 0;
-        state.readerData.chunks.forEach(c => { const t = c.source; let si = ci; let ei = ci + t.length - 1; while (si <= ei && si < chars.length && chars[si].trim() === '') si++; while (ei >= si && ei < chars.length && chars[ei].trim() === '') ei--; if (si <= ei && si < chars.length && ei < chars.length) { c.audioStart = starts[si]; c.audioEnd = ends[ei]; } else { c.audioStart = null; c.audioEnd = null; } ci += t.length; });
+        const chars = state.alignmentData.characters;
+        const starts = state.alignmentData.character_start_times_seconds;
+        const ends = state.alignmentData.character_end_times_seconds;
+
+        // Match non-whitespace characters between source and alignment,
+        // skipping whitespace independently on each side to prevent drift.
+        let ai = 0; // alignment index
+        state.readerData.chunks.forEach(c => {
+            const src = c.source;
+            let firstAi = -1, lastAi = -1;
+            for (let si = 0; si < src.length; si++) {
+                if (src[si].trim() === '') continue; // skip source whitespace
+                while (ai < chars.length && chars[ai].trim() === '') ai++; // skip alignment whitespace
+                if (ai < chars.length) {
+                    if (firstAi === -1) firstAi = ai;
+                    lastAi = ai;
+                    ai++;
+                }
+            }
+            if (firstAi >= 0 && lastAi >= 0) {
+                c.audioStart = starts[firstAi];
+                c.audioEnd = ends[lastAi];
+            } else {
+                c.audioStart = null;
+                c.audioEnd = null;
+            }
+        });
     }
 
     function setupAudioSync() {
@@ -1291,8 +1316,12 @@
             const t = audio.currentTime; let aid = null; let fallback = null;
             for (const c of state.readerData.chunks) {
                 if (c.audioStart === null || c.audioEnd === null) continue;
+                // Zero-duration chunk: match within a small window
+                if (c.audioStart === c.audioEnd) {
+                    if (t >= c.audioStart && t < c.audioStart + 0.05) { if (!fallback) fallback = c.id; }
+                    continue;
+                }
                 if (t >= c.audioStart && t < c.audioEnd) { aid = c.id; break; }
-                if (!aid && t === c.audioEnd) { fallback = c.id; }
                 if (!fallback && t >= c.audioStart && t < c.audioEnd + 0.1) fallback = c.id;
             }
             if (!aid) aid = fallback;
