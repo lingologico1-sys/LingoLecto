@@ -199,7 +199,8 @@
         .qr-option.qr-picked .qr-opt-marker { background: var(--accent); color: white; }
         .qr-option.qr-correct .qr-opt-marker { background: var(--success); color: white; }
         .qr-option.qr-wrong .qr-opt-marker { background: var(--error); color: white; }
-        .qr-btns { display: flex; gap: 8px; }
+        .qr-btns { display: flex; gap: 8px; align-items: stretch; }
+        .qr-btns .btn { display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.2; }
         .qr-score-box { margin-top: 14px; padding: 16px; background: var(--success-bg); border: 1px solid rgba(45,122,79,0.3); border-radius: 10px; text-align: center; }
         .qr-score-pct { font-size: 36px; font-weight: 700; color: var(--success); line-height: 1; }
         .qr-score-label { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
@@ -2308,7 +2309,7 @@
         panel.innerHTML = `
             <div class="qr-counter">Question ${qrIdx + 1} of ${total} &nbsp;·&nbsp; ${answeredCount} answered</div>
             <div class="qr-progress"><div class="qr-progress-fill" style="width:${(answeredCount/total)*100}%"></div></div>
-            <div class="qr-question-text">${escapeHtml(cur.q.question || cur.q.stem || '')}</div>
+            <div class="qr-question-text">${escapeHtml(cur.q.question_text || cur.q.question || cur.q.stem || '')}</div>
             <div class="qr-options" id="qr-options">${optionsHtml}</div>
             <div class="qr-btns">
                 <button class="btn btn-secondary" id="qr-prev" ${prevDisabled ? 'disabled' : ''} style="flex:1">← Prev</button>
