@@ -317,8 +317,8 @@
         <div class="reader-tabs">
             <div class="reader-tab active" data-rtab="reader">Reader</div>
             <div class="reader-tab" data-rtab="editor">Editor</div>
-            <div class="reader-tab" data-rtab="data">Data</div>
             <div class="reader-tab" data-rtab="questions">Questions</div>
+            <div class="reader-tab" data-rtab="data">Data</div>
         </div>
 
         <!-- Reader Panel -->
@@ -437,6 +437,26 @@
                         </div>
                     </div>
                     <textarea class="data-textarea" id="data-audio-json" spellcheck="false" readonly></textarea>
+                </div>
+
+                <div class="data-section">
+                    <div class="data-section-header">
+                        <div class="data-section-title">Questions JSON</div>
+                        <div class="data-section-actions">
+                            <button class="btn-sm" id="btn-copy-questions-json">Copy</button>
+                        </div>
+                    </div>
+                    <textarea class="data-textarea" id="data-questions-json" spellcheck="false" readonly></textarea>
+                </div>
+
+                <div class="data-section">
+                    <div class="data-section-header">
+                        <div class="data-section-title">Full Lecto JSON</div>
+                        <div class="data-section-actions">
+                            <button class="btn-sm" id="btn-copy-full-json">Copy</button>
+                        </div>
+                    </div>
+                    <textarea class="data-textarea" id="data-full-json" spellcheck="false" readonly></textarea>
                 </div>
 
                 <div class="data-section">
@@ -1294,6 +1314,22 @@
         // Audio alignment JSON
         $('data-audio-json').value = state.alignmentData ? JSON.stringify(state.alignmentData, null, 2) : '(no alignment data)';
 
+        // Questions JSON
+        $('data-questions-json').value = state.questionsData ? JSON.stringify(state.questionsData, null, 2) : '(no questions data)';
+
+        // Full lecto JSON (consolidated — mirrors what gets published to Cloudflare)
+        const fullLecto = {
+            title: $('data-title').value || state.title || '',
+            slug: state.slug || '',
+            source_language: state.readerData ? state.readerData.source_language : '',
+            chunks: state.readerData ? state.readerData.chunks : [],
+            tiptap_html: state.tiptapData ? state.tiptapData.html : '',
+            alignment: state.alignmentData || null,
+            audio_url: state.audioUrl || null,
+            questions: state.questionsData || null
+        };
+        $('data-full-json').value = JSON.stringify(fullLecto, null, 2);
+
         // Sync voice settings from setup
         $('data-voiceId').value = $('voiceId').value;
         $('data-stability').value = $('stability').value;
@@ -1318,6 +1354,8 @@
     $('btn-copy-chunks').addEventListener('click', () => copyToClipboard($('data-chunks-json').value, $('btn-copy-chunks')));
     $('btn-copy-tiptap-data').addEventListener('click', () => copyToClipboard($('data-tiptap-json').value, $('btn-copy-tiptap-data')));
     $('btn-copy-audio-json').addEventListener('click', () => copyToClipboard($('data-audio-json').value, $('btn-copy-audio-json')));
+    $('btn-copy-questions-json').addEventListener('click', () => copyToClipboard($('data-questions-json').value, $('btn-copy-questions-json')));
+    $('btn-copy-full-json').addEventListener('click', () => copyToClipboard($('data-full-json').value, $('btn-copy-full-json')));
 
     // Apply chunking JSON
     $('btn-apply-chunks').addEventListener('click', () => {
