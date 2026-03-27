@@ -2245,8 +2245,8 @@
         // Wire up footer buttons once
         if (!$('qr-prev')._qrBound) {
             $('qr-prev')._qrBound = true;
-            $('qr-prev').addEventListener('click', () => { if (qrIdx > 0) { qrIdx--; renderQrQuestion(); } });
-            $('qr-next').addEventListener('click', () => { if (qrIdx < qrPrepared.length - 1) { qrIdx++; renderQrQuestion(); } });
+            $('qr-prev').addEventListener('click', () => { qrIdx = qrIdx > 0 ? qrIdx - 1 : qrPrepared.length - 1; renderQrQuestion(); });
+            $('qr-next').addEventListener('click', () => { qrIdx = qrIdx < qrPrepared.length - 1 ? qrIdx + 1 : 0; renderQrQuestion(); });
             $('qr-submit').addEventListener('click', () => {
                 if (!qrPrepared[qrIdx] || qrPrepared[qrIdx].picked === null || qrPrepared[qrIdx].answered) return;
                 qrPrepared[qrIdx].answered = true;
@@ -2330,8 +2330,8 @@
             ${scoreHtml}`;
 
         // Update footer button states
-        const btnPrev = $('qr-prev'); if (btnPrev) btnPrev.disabled = qrIdx === 0;
-        const btnNext = $('qr-next'); if (btnNext) btnNext.disabled = qrIdx === total - 1;
+        const btnPrev = $('qr-prev'); if (btnPrev) btnPrev.disabled = false;
+        const btnNext = $('qr-next'); if (btnNext) btnNext.disabled = false;
         const btnSubmit = $('qr-submit');
         if (btnSubmit) { btnSubmit.disabled = cur.picked === null || isAnswered; btnSubmit.textContent = isAnswered ? 'Answered' : 'Submit'; }
 
