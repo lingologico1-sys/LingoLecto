@@ -1739,11 +1739,13 @@
                         tapResumeTime = null;
                         audio.play();
                     } else {
+                        hideTooltip();
                         audio.pause();
                     }
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
+                    hideTooltip();
                     if (!audio.paused) audio.pause();
                     navLock = true;
                     {
@@ -1763,6 +1765,7 @@
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
+                    hideTooltip();
                     if (!audio.paused) audio.pause();
                     navLock = true;
                     {
