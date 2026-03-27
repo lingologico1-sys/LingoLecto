@@ -244,10 +244,103 @@ app.get('/api/chunk/:jobId', (req, res) => {
     res.json({ status: 'done', result, usage });
 });
 
+// ── OpenAI: generate IB questions (async polling) ────────────────────────
+const questionJobs = new Map();
+
+app.post('/api/questions', requireAuth, (req, res) => {
+    const { examTitle, sourceText } = req.body;
+    if (!sourceText || !sourceText.trim()) return res.status(400).json({ error: 'sourceText is required' });
+    if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not set' });
+
+    const jobId = 'qjob_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    questionJobs.set(jobId, { status: 'processing', startedAt: Date.now() });
+
+    (async () => {
+        try {
+            const apiResponse = await fetch('https://api.openai.com/v1/responses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_API_KEY },
+                signal: AbortSignal.timeout(600000),
+                dispatcher: longTimeoutAgent,
+                body: JSON.stringify({
+                    model: 'gpt-5.2',
+                    reasoning: { effort: 'high' },
+                    text: { verbosity: 'low' },
+                    prompt: {
+                        id: 'pmpt_6993dce769d081958795777ea62764120520f929bc8ef915',
+                        version: '11',
+                        variables: { exam_title: examTitle || '', source_text: sourceText }
+                    }
+                })
+            });
+            if (!apiResponse.ok) {
+                const errText = await apiResponse.text();
+                questionJobs.set(jobId, { status: 'error', error: `OpenAI API Error: ${apiResponse.status} - ${errText}` });
+                return;
+            }
+            const data = await apiResponse.json();
+            let outputText = '';
+            if (data.output) {
+                for (const item of data.output) {
+                    if (item.type === 'message' && item.content) {
+                        for (const block of item.content) {
+                            if (block.type === 'output_text') outputText += block.text;
+                        }
+                    }
+                }
+            }
+            if (!outputText) { questionJobs.set(jobId, { status: 'error', error: 'No text output from OpenAI' }); return; }
+            let cleaned = outputText.trim();
+            if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            let parsed;
+            try { parsed = JSON.parse(cleaned); } catch (e) { questionJobs.set(jobId, { status: 'error', error: 'Invalid JSON from OpenAI: ' + e.message }); return; }
+            if (!parsed.questions || !Array.isArray(parsed.questions)) { questionJobs.set(jobId, { status: 'error', error: 'Response missing questions array' }); return; }
+            questionJobs.set(jobId, { status: 'done', result: parsed });
+        } catch (err) {
+            console.error('Questions error:', err);
+            questionJobs.set(jobId, { status: 'error', error: err.message || 'Internal server error' });
+        }
+        setTimeout(() => questionJobs.delete(jobId), 300000);
+    })();
+
+    res.json({ jobId });
+});
+
+app.get('/api/questions/:jobId', (req, res) => {
+    const job = questionJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (job.status === 'processing') return res.json({ status: 'processing', elapsed: Date.now() - job.startedAt });
+    if (job.status === 'error') { questionJobs.delete(req.params.jobId); return res.status(500).json({ status: 'error', error: job.error }); }
+    const result = job.result;
+    questionJobs.delete(req.params.jobId);
+    res.json({ status: 'done', result });
+});
+
+// ── Patch questions into existing lecto JSON ─────────────────────────────
+app.patch('/api/lectos/:slug/questions', requireAuth, async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const { questions } = req.body;
+        if (!questions) return res.status(400).json({ ok: false, error: 'questions is required' });
+        const s3 = makeR2Client();
+        if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
+        const key = `json/${slug}.json`;
+        const getRes = await s3.send(new GetObjectCommand({ Bucket: LECTO_BUCKET, Key: key }));
+        const body = await getRes.Body.transformToString();
+        const existing = JSON.parse(body);
+        existing.questions = questions;
+        await s3.send(new PutObjectCommand({ Bucket: LECTO_BUCKET, Key: key, ContentType: 'application/json', Body: JSON.stringify(existing) }));
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('Patch questions error:', err);
+        res.status(500).json({ ok: false, error: err.message || 'Failed to update lecto' });
+    }
+});
+
 // ── Publish: upload audio + images + consolidated JSON to lecto bucket ──
 app.post('/api/publish', requireAuth, async (req, res) => {
     try {
-        const { title, readerData, tiptapData, alignmentData, audioBase64 } = req.body;
+        const { title, readerData, tiptapData, alignmentData, audioBase64, questionsData } = req.body;
 
         if (!title) return res.status(400).json({ ok: false, error: 'title is required' });
         if (!readerData) return res.status(400).json({ ok: false, error: 'readerData is required' });
@@ -306,7 +399,8 @@ app.post('/api/publish', requireAuth, async (req, res) => {
             chunks: readerData.chunks,
             tiptap_html: processedHtml,
             alignment: alignmentData || null,
-            audio_url: audioUrl
+            audio_url: audioUrl,
+            questions: questionsData || null
         };
 
         // 4. Upload JSON

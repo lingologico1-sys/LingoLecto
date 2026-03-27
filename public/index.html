@@ -179,6 +179,27 @@
 
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* Question cards */
+        .q-cat-heading { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); padding: 12px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 10px; margin-top: 8px; }
+        .q-card { background: var(--surface); border: 1px solid var(--border-light); border-radius: 8px; padding: 14px 16px; margin-bottom: 8px; transition: border-color 0.15s; }
+        .q-card.q-selected { border-color: var(--accent); background: var(--accent-glow); }
+        .q-card-top { display: flex; align-items: flex-start; gap: 10px; }
+        .q-card-top input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+        .q-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+        .q-tag { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: var(--border-light); color: var(--text-secondary); }
+        .q-tag-global { background: rgba(194,112,62,0.12); color: var(--accent-deep); }
+        .q-tag-detailed { background: rgba(45,122,79,0.1); color: var(--success); }
+        .q-tag-grammar { background: rgba(74,86,200,0.1); color: #4a56c8; }
+        .q-text { font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 8px; line-height: 1.5; }
+        .q-source { font-size: 12px; color: var(--text-secondary); font-style: italic; margin-bottom: 8px; padding: 6px 10px; background: var(--paper); border-radius: 5px; border-left: 3px solid var(--border); line-height: 1.5; }
+        .q-target-clue { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+        .q-highlight { font-weight: 700; font-style: italic; color: var(--accent); }
+        .q-options { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+        .q-options li { font-size: 13px; padding: 6px 10px; border-radius: 5px; background: var(--paper); border: 1px solid var(--border-light); display: flex; align-items: center; gap: 8px; color: var(--ink); }
+        .q-options li.q-correct { background: var(--success-bg); border-color: rgba(45,122,79,0.3); }
+        .q-opt-marker { font-size: 10px; font-weight: 700; width: 20px; height: 20px; min-width: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--border-light); color: var(--text-secondary); flex-shrink: 0; }
+        .q-options li.q-correct .q-opt-marker { background: var(--success); color: white; }
+
         @media (max-width: 600px) {
             .site-header { padding: 14px 16px; }
             .setup-wrap { padding: 24px 16px 80px; }
@@ -297,6 +318,7 @@
             <div class="reader-tab active" data-rtab="reader">Reader</div>
             <div class="reader-tab" data-rtab="editor">Editor</div>
             <div class="reader-tab" data-rtab="data">Data</div>
+            <div class="reader-tab" data-rtab="questions">Questions</div>
         </div>
 
         <!-- Reader Panel -->
@@ -485,6 +507,47 @@
             </div>
         </div>
 
+        <!-- Questions Panel -->
+        <div class="reader-panel" id="rpanel-questions">
+            <div class="data-container">
+                <div class="data-section">
+                    <div class="data-section-header">
+                        <div class="data-section-title">Generate IB Questions</div>
+                    </div>
+                    <div class="form-card" style="margin-top:8px;">
+                        <div class="field">
+                            <div class="field-label"><span>Exam Title</span></div>
+                            <input type="text" id="q-exam-title" spellcheck="false" placeholder="e.g. IB French ab initio — Paper 2 Reading" style="width:100%;" />
+                        </div>
+                        <div class="field">
+                            <div class="field-label"><span>Source Text</span></div>
+                            <textarea id="q-source-text" class="data-textarea" style="height:160px;" spellcheck="false" placeholder="Source text will be pre-filled from the lecto..."></textarea>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="btn-generate-questions" style="margin-top:12px;">&#9889; Generate 30 Questions</button>
+                    <div class="status-msg" id="q-gen-status" style="margin-top:8px;"></div>
+                </div>
+
+                <div id="q-questions-area" style="display:none; margin-top:24px; border-top:1px solid var(--border); padding-top:20px;">
+                    <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">
+                        Total: <strong id="q-stat-total" style="color:var(--ink);">0</strong> &nbsp;·&nbsp; Selected: <strong id="q-stat-selected" style="color:var(--ink);">0</strong>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px;">
+                        <button class="btn-sm" id="q-btn-select-all">Select All</button>
+                        <button class="btn-sm" id="q-btn-deselect-all">Deselect All</button>
+                        <button class="btn-sm" id="q-btn-global">Global Comprehension</button>
+                        <button class="btn-sm" id="q-btn-detailed">Detailed Comprehension</button>
+                        <button class="btn-sm" id="q-btn-grammar">Grammar &amp; Vocabulary</button>
+                    </div>
+                    <div id="q-questions-list"></div>
+                    <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
+                        <button class="btn btn-primary" id="btn-add-questions">Add Questions to this Lecto</button>
+                        <div class="status-msg" id="q-add-status" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="stats-bar">
             <div class="stat">Words tapped: <span class="stat-num" id="tapCount">0</span></div>
             <div class="stat">Unique: <span class="stat-num" id="uniqueCount">0</span></div>
@@ -501,7 +564,7 @@
     const STORAGE_KEY = 'lingoreader-state';
     const ALL_LANGUAGES = { en:"English", es:"Español", de:"Deutsch", pt:"Português", it:"Italiano", ja:"日本語", hi:"हिन्दी", ar:"العربية", zh_hans:"简体中文", zh_hant:"繁體中文" };
 
-    let state = { readerData: null, alignmentData: null, tiptapData: null, audioBase64: null, audioUrl: null, tappedIds: new Set(), tapCount: 0 };
+    let state = { readerData: null, alignmentData: null, tiptapData: null, audioBase64: null, audioUrl: null, tappedIds: new Set(), tapCount: 0, questionsData: null, slug: null, title: null };
     let chunkMap = new Map();
     let activeChunkEl = null;
     let currentAudioChunkId = null;
@@ -534,7 +597,7 @@
     // ================================================================
     function saveState() {
         try {
-            const s = { readerData: state.readerData, alignmentData: state.alignmentData, tiptapData: state.tiptapData, audioBase64: state.audioBase64, audioUrl: state.audioUrl, tappedIds: Array.from(state.tappedIds), tapCount: state.tapCount };
+            const s = { readerData: state.readerData, alignmentData: state.alignmentData, tiptapData: state.tiptapData, audioBase64: state.audioBase64, audioUrl: state.audioUrl, tappedIds: Array.from(state.tappedIds), tapCount: state.tapCount, questionsData: state.questionsData, slug: state.slug, title: state.title };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
         } catch (e) {}
     }
@@ -545,7 +608,7 @@
             if (!raw) return false;
             const s = JSON.parse(raw);
             if (!s.readerData) return false;
-            state.readerData = s.readerData; state.alignmentData = s.alignmentData || null; state.tiptapData = s.tiptapData || null; state.audioBase64 = s.audioBase64 || null; state.audioUrl = s.audioUrl || null; state.tappedIds = new Set(s.tappedIds || []); state.tapCount = s.tapCount || 0;
+            state.readerData = s.readerData; state.alignmentData = s.alignmentData || null; state.tiptapData = s.tiptapData || null; state.audioBase64 = s.audioBase64 || null; state.audioUrl = s.audioUrl || null; state.tappedIds = new Set(s.tappedIds || []); state.tapCount = s.tapCount || 0; state.questionsData = s.questionsData || null; state.slug = s.slug || null; state.title = s.title || null;
             return true;
         } catch (e) { return false; }
     }
@@ -1007,6 +1070,7 @@
             $('rpanel-' + tab.dataset.rtab).classList.add('active');
             if (tab.dataset.rtab === 'data') populateDataPanel();
             if (tab.dataset.rtab === 'editor') initReaderEditor();
+            if (tab.dataset.rtab === 'questions') initQuestionsPanel();
         });
     });
 
@@ -1376,7 +1440,8 @@
                     readerData: state.readerData,
                     tiptapData: state.tiptapData,
                     alignmentData: state.alignmentData,
-                    audioBase64: state.audioBase64
+                    audioBase64: state.audioBase64,
+                    questionsData: state.questionsData || null
                 })
             });
             const data = await res.json();
@@ -1448,6 +1513,10 @@
             state.audioUrl = data.audio_url ? `/api/lectos/${encodeURIComponent(lecto.slug)}/audio` : null;
             state.tappedIds = new Set();
             state.tapCount = 0;
+            state.questionsData = data.questions || null;
+            state.slug = lecto.slug;
+            state.title = lecto.title;
+            if ($('data-title')) $('data-title').value = lecto.title || '';
             saveState();
 
             // Switch to reader view
@@ -1479,6 +1548,190 @@
     };
 
     function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    // ================================================================
+    // QUESTIONS PANEL
+    // ================================================================
+    let questionsData = null;
+    let qCheckedIds = new Set();
+
+    function initQuestionsPanel() {
+        const sourceEl = $('q-source-text');
+        if (sourceEl && state.readerData && !sourceEl.value) {
+            sourceEl.value = state.readerData.chunks.map(c => c.source).join('');
+        }
+        const titleEl = $('q-exam-title');
+        if (titleEl && !titleEl.value) {
+            titleEl.value = state.title || $('data-title').value || '';
+        }
+        if (questionsData) renderQuestionsPanel(questionsData);
+    }
+
+    $('btn-generate-questions').addEventListener('click', async () => {
+        const examTitle = $('q-exam-title').value.trim();
+        const sourceText = $('q-source-text').value.trim();
+        if (!sourceText) { setQGenStatus('Source text is required.', 'error'); return; }
+        setQGenStatus('Generating questions — this may take 1–2 minutes…', 'loading');
+        $('btn-generate-questions').disabled = true;
+        try {
+            const startRes = await authedFetch('/api/questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ examTitle, sourceText })
+            });
+            if (!startRes.ok) { const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` })); throw new Error(err.error || 'Failed to start'); }
+            const { jobId } = await startRes.json();
+            const result = await new Promise((resolve, reject) => {
+                const poll = async () => {
+                    try {
+                        const pollRes = await fetch('/api/questions/' + jobId);
+                        if (!pollRes.ok) { reject(new Error(`Poll failed: ${pollRes.status}`)); return; }
+                        const data = await pollRes.json();
+                        if (data.status === 'processing') { setTimeout(poll, 2000); return; }
+                        if (data.status === 'error') { reject(new Error(data.error || 'Generation failed')); return; }
+                        resolve(data.result);
+                    } catch (e) { reject(e); }
+                };
+                poll();
+            });
+            setQGenStatus('✓ Generated ' + result.questions.length + ' questions.', 'success');
+            renderQuestionsPanel(result);
+        } catch (err) {
+            setQGenStatus('Error: ' + err.message, 'error');
+        } finally {
+            $('btn-generate-questions').disabled = false;
+        }
+    });
+
+    function setQGenStatus(msg, type) {
+        const el = $('q-gen-status');
+        el.textContent = msg;
+        el.className = 'status-msg ' + (type || '');
+    }
+
+    function renderQuestionsPanel(data) {
+        questionsData = data;
+        qCheckedIds = new Set(data.questions.map(q => q.id));
+        const list = $('q-questions-list');
+        list.innerHTML = '';
+        const categories = [
+            { key: 'global_comprehension', label: 'Category 1 — Global Comprehension' },
+            { key: 'detailed_comprehension', label: 'Category 2 — Detailed Comprehension' },
+            { key: 'grammar_vocabulary', label: 'Category 3 — Grammar & Vocabulary' }
+        ];
+        for (const cat of categories) {
+            const catQs = data.questions.filter(q => q.category === cat.key);
+            if (!catQs.length) continue;
+            const heading = document.createElement('div');
+            heading.className = 'q-cat-heading';
+            heading.textContent = cat.label + ' (' + catQs.length + ')';
+            list.appendChild(heading);
+            catQs.forEach(q => list.appendChild(buildQCard(q)));
+        }
+        updateQStats();
+        $('q-questions-area').style.display = 'block';
+    }
+
+    function buildQCard(q) {
+        const card = document.createElement('div');
+        card.className = 'q-card' + (qCheckedIds.has(q.id) ? ' q-selected' : '');
+        card.dataset.qid = q.id;
+        card.dataset.qcat = q.category;
+        const catTagClass = q.category === 'global_comprehension' ? 'q-tag-global' : q.category === 'detailed_comprehension' ? 'q-tag-detailed' : 'q-tag-grammar';
+        const catLabel = q.category === 'global_comprehension' ? 'Global' : q.category === 'detailed_comprehension' ? 'Detailed' : 'Grammar';
+        const typeLabels = { text_type: 'Text Type', audience: 'Audience', main_idea: 'Main Idea', true_false: 'True/False', comprehension_mcq: 'Comprehension', text_based_answer: 'Text-Based', reference: 'Reference', synonym: 'Synonym', antonym: 'Antonym' };
+        const letters = ['A','B','C','D','E'];
+        const correctOpt = q.options[q.correct_index];
+        const displayOptions = [correctOpt, ...q.options.filter((_, i) => i !== q.correct_index)];
+
+        let sourceSentenceHtml = '';
+        if (q.source_sentence) {
+            let ss = escapeHtml(q.source_sentence);
+            if (q.target) {
+                const safe = q.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                let rx;
+                try { rx = new RegExp('(?<![\\p{L}\\p{N}])(' + safe + ')(?![\\p{L}\\p{N}])', 'giu'); } catch(e) { rx = new RegExp('(' + safe + ')', 'gi'); }
+                ss = ss.replace(rx, m => '<span class="q-highlight">' + m + '</span>');
+            }
+            sourceSentenceHtml = '<div class="q-source">« ' + ss + ' »</div>';
+        }
+        let targetClueHtml = '';
+        if (q.target || q.clue) {
+            targetClueHtml = '<div class="q-target-clue">';
+            if (q.target) targetClueHtml += '<strong>Target:</strong> ' + escapeHtml(q.target);
+            if (q.target && q.clue) targetClueHtml += ' &nbsp;·&nbsp; ';
+            if (q.clue) targetClueHtml += '<strong>Clue:</strong> ' + escapeHtml(q.clue);
+            targetClueHtml += '</div>';
+        }
+        let optionsHtml = '<ul class="q-options">';
+        displayOptions.forEach((opt, i) => {
+            optionsHtml += '<li class="' + (i === 0 ? 'q-correct' : '') + '"><span class="q-opt-marker">' + letters[i] + '</span>' + escapeHtml(opt) + '</li>';
+        });
+        optionsHtml += '</ul>';
+
+        card.innerHTML = '<div class="q-card-top"><input type="checkbox" data-qid="' + q.id + '" ' + (qCheckedIds.has(q.id) ? 'checked' : '') + '><div style="flex:1;"><div class="q-tags"><span class="q-tag ' + catTagClass + '">' + catLabel + '</span><span class="q-tag">' + (typeLabels[q.type] || q.type) + '</span><span class="q-tag">Q' + q.id + '</span></div><div class="q-text">' + escapeHtml(q.question_text) + '</div>' + sourceSentenceHtml + targetClueHtml + optionsHtml + '</div></div>';
+
+        card.querySelector('input[type="checkbox"]').addEventListener('change', function() {
+            const qid = parseInt(this.dataset.qid);
+            if (this.checked) { qCheckedIds.add(qid); card.classList.add('q-selected'); }
+            else { qCheckedIds.delete(qid); card.classList.remove('q-selected'); }
+            updateQStats();
+        });
+        return card;
+    }
+
+    function updateQStats() {
+        $('q-stat-total').textContent = questionsData ? questionsData.questions.length : 0;
+        $('q-stat-selected').textContent = qCheckedIds.size;
+    }
+
+    function syncQCheckboxes() {
+        $('q-questions-list').querySelectorAll('.q-card').forEach(card => {
+            const id = parseInt(card.dataset.qid);
+            const cb = card.querySelector('input[type="checkbox"]');
+            if (qCheckedIds.has(id)) { cb.checked = true; card.classList.add('q-selected'); }
+            else { cb.checked = false; card.classList.remove('q-selected'); }
+        });
+        updateQStats();
+    }
+
+    $('q-btn-select-all').addEventListener('click', () => { if (questionsData) { qCheckedIds = new Set(questionsData.questions.map(q => q.id)); syncQCheckboxes(); } });
+    $('q-btn-deselect-all').addEventListener('click', () => { qCheckedIds.clear(); syncQCheckboxes(); });
+    $('q-btn-global').addEventListener('click', () => { if (questionsData) { questionsData.questions.forEach(q => { if (q.category === 'global_comprehension') qCheckedIds.add(q.id); else qCheckedIds.delete(q.id); }); syncQCheckboxes(); } });
+    $('q-btn-detailed').addEventListener('click', () => { if (questionsData) { questionsData.questions.forEach(q => { if (q.category === 'detailed_comprehension') qCheckedIds.add(q.id); else qCheckedIds.delete(q.id); }); syncQCheckboxes(); } });
+    $('q-btn-grammar').addEventListener('click', () => { if (questionsData) { questionsData.questions.forEach(q => { if (q.category === 'grammar_vocabulary') qCheckedIds.add(q.id); else qCheckedIds.delete(q.id); }); syncQCheckboxes(); } });
+
+    $('btn-add-questions').addEventListener('click', async () => {
+        if (!questionsData) return;
+        const selectedQs = questionsData.questions.filter(q => qCheckedIds.has(q.id));
+        if (!selectedQs.length) { setQAddStatus('No questions selected.', 'error'); return; }
+        const output = { exam_title: $('q-exam-title').value.trim() || questionsData.exam_title || '', questions: selectedQs };
+        state.questionsData = output;
+        saveState();
+        if (state.slug) {
+            setQAddStatus('Updating lecto on Cloudflare…', 'loading');
+            try {
+                const res = await authedFetch('/api/lectos/' + encodeURIComponent(state.slug) + '/questions', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ questions: output })
+                });
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error || 'Patch failed');
+                setQAddStatus('✓ Questions added and lecto updated on Cloudflare.', 'success');
+            } catch (e) {
+                setQAddStatus('Error: ' + e.message, 'error');
+            }
+        } else {
+            setQAddStatus('✓ Questions saved. They will be included when you publish this lecto.', 'success');
+        }
+    });
+
+    function setQAddStatus(msg, type) {
+        const el = $('q-add-status');
+        el.textContent = msg;
+        el.className = 'status-msg ' + (type || '');
+    }
 
     function buildPlainChunkHtml() {
         let h = '<p>';
