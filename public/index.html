@@ -1392,10 +1392,15 @@
 
     // Download audio as .mp3
     $('btn-download-audio').addEventListener('click', () => {
-        if (!state.audioBase64) { alert('No audio available'); return; }
         const a = document.createElement('a');
-        a.href = 'data:audio/mpeg;base64,' + state.audioBase64;
-        a.download = 'audio.mp3';
+        if (state.audioBase64) {
+            a.href = 'data:audio/mpeg;base64,' + state.audioBase64;
+        } else if (state.audioUrl) {
+            a.href = state.audioUrl;
+        } else {
+            alert('No audio available'); return;
+        }
+        a.download = (state.title || state.slug || 'audio') + '.mp3';
         a.click();
     });
 
