@@ -182,8 +182,11 @@
         /* Questioner layout */
         .questioner-wrap { display: grid; grid-template-columns: 1fr 360px; height: calc(100vh - 57px); }
         .questioner-left { padding: 40px 40px 120px; border-right: 1px solid var(--border); overflow-y: auto; height: 100%; box-sizing: border-box; }
-        .questioner-right { position: sticky; top: 57px; height: calc(100vh - 57px); overflow-y: auto; padding: 20px 18px; background: var(--paper); display: flex; flex-direction: column; gap: 0; }
-        .qr-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .questioner-right { position: sticky; top: 57px; height: calc(100vh - 57px); background: var(--paper); display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+        .qr-scroll { flex: 1; overflow-y: auto; padding: 16px 14px 8px; }
+        .qr-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+        .qr-footer { flex-shrink: 0; display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--border); background: var(--paper); }
+        .qr-footer .btn { flex: 1; padding: 8px 6px; font-size: 12px; font-weight: 600; min-width: 0; }
         .qr-counter { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 12px; }
         .qr-progress { height: 3px; background: var(--border-light); border-radius: 99px; margin-bottom: 16px; overflow: hidden; }
         .qr-progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.3s; }
@@ -199,8 +202,7 @@
         .qr-option.qr-picked .qr-opt-marker { background: var(--accent); color: white; }
         .qr-option.qr-correct .qr-opt-marker { background: var(--success); color: white; }
         .qr-option.qr-wrong .qr-opt-marker { background: var(--error); color: white; }
-        .qr-btns { display: flex; gap: 8px; align-items: stretch; position: sticky; bottom: 0; background: var(--surface); padding: 12px 0 4px; margin: 0 -20px -20px; padding-left: 20px; padding-right: 20px; border-top: 1px solid var(--border); }
-        .qr-btns .btn { display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.2; min-width: 0; }
+        .qr-score-box { margin-top: 12px; }
         .qr-score-box { margin-top: 14px; padding: 16px; background: var(--success-bg); border: 1px solid rgba(45,122,79,0.3); border-radius: 10px; text-align: center; }
         .qr-score-pct { font-size: 36px; font-weight: 700; color: var(--success); line-height: 1; }
         .qr-score-label { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
@@ -365,7 +367,14 @@
                     <div class="reader-text" id="questioner-text"></div>
                 </div>
                 <div class="questioner-right" id="questioner-right">
-                    <div class="qr-panel" id="qr-panel"></div>
+                    <div class="qr-scroll" id="qr-scroll">
+                        <div class="qr-panel" id="qr-panel"></div>
+                    </div>
+                    <div class="qr-footer" id="qr-footer">
+                        <button class="btn btn-secondary" id="qr-prev">← Prev</button>
+                        <button class="btn btn-primary" id="qr-submit">Submit</button>
+                        <button class="btn btn-secondary" id="qr-next">Next →</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2233,6 +2242,18 @@
             qrInitialized = true;
         }
 
+        // Wire up footer buttons once
+        if (!$('qr-prev')._qrBound) {
+            $('qr-prev')._qrBound = true;
+            $('qr-prev').addEventListener('click', () => { if (qrIdx > 0) { qrIdx--; renderQrQuestion(); } });
+            $('qr-next').addEventListener('click', () => { if (qrIdx < qrPrepared.length - 1) { qrIdx++; renderQrQuestion(); } });
+            $('qr-submit').addEventListener('click', () => {
+                if (!qrPrepared[qrIdx] || qrPrepared[qrIdx].picked === null || qrPrepared[qrIdx].answered) return;
+                qrPrepared[qrIdx].answered = true;
+                renderQrQuestion();
+            });
+        }
+
         // Set active audio to questioner
         activeAudioId = 'questionerAudio';
 
@@ -2301,23 +2322,20 @@
             return `<div class="${cls}" data-opt="${i}"><span class="qr-opt-marker">${marker}</span><span>${escapeHtml(opt.text)}</span></div>`;
         }).join('');
 
-        const submitDisabled = cur.picked === null || isAnswered;
-        const prevDisabled = qrIdx === 0;
-        const nextDisabled = qrIdx === total - 1;
-
         panel.innerHTML = `
             <div class="qr-counter">Question ${qrIdx + 1} of ${total} &nbsp;·&nbsp; ${answeredCount} answered</div>
             <div class="qr-progress"><div class="qr-progress-fill" style="width:${(answeredCount/total)*100}%"></div></div>
             <div class="qr-question-text">${escapeHtml(cur.q.question_text || cur.q.question || cur.q.stem || '')}</div>
             <div class="qr-options" id="qr-options">${optionsHtml}</div>
-            <div class="qr-btns">
-                <button class="btn btn-secondary" id="qr-prev" ${prevDisabled ? 'disabled' : ''} style="flex:1">← Prev</button>
-                <button class="btn btn-primary" id="qr-submit" ${submitDisabled ? 'disabled' : ''} style="flex:1">${isAnswered ? 'Answered' : 'Submit'}</button>
-                <button class="btn btn-secondary" id="qr-next" ${nextDisabled ? 'disabled' : ''} style="flex:1">Next →</button>
-            </div>
             ${scoreHtml}`;
 
-        // Option click handler (only if not answered)
+        // Update footer button states
+        const btnPrev = $('qr-prev'); if (btnPrev) btnPrev.disabled = qrIdx === 0;
+        const btnNext = $('qr-next'); if (btnNext) btnNext.disabled = qrIdx === total - 1;
+        const btnSubmit = $('qr-submit');
+        if (btnSubmit) { btnSubmit.disabled = cur.picked === null || isAnswered; btnSubmit.textContent = isAnswered ? 'Answered' : 'Submit'; }
+
+        // Option click handler
         panel.querySelectorAll('.qr-option').forEach(el => {
             el.addEventListener('click', () => {
                 if (cur.answered) return;
@@ -2326,17 +2344,6 @@
                 renderQrQuestion();
             });
         });
-
-        const btnSubmit = $('qr-submit');
-        if (btnSubmit) btnSubmit.addEventListener('click', () => {
-            if (cur.picked === null || cur.answered) return;
-            cur.answered = true;
-            renderQrQuestion();
-        });
-        const btnNext = $('qr-next');
-        if (btnNext) btnNext.addEventListener('click', () => { if (qrIdx < total - 1) { qrIdx++; renderQrQuestion(); } });
-        const btnPrev = $('qr-prev');
-        if (btnPrev) btnPrev.addEventListener('click', () => { if (qrIdx > 0) { qrIdx--; renderQrQuestion(); } });
     }
 
     // ================================================================
