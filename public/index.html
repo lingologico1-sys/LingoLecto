@@ -199,8 +199,8 @@
         .qr-option.qr-picked .qr-opt-marker { background: var(--accent); color: white; }
         .qr-option.qr-correct .qr-opt-marker { background: var(--success); color: white; }
         .qr-option.qr-wrong .qr-opt-marker { background: var(--error); color: white; }
-        .qr-btns { display: flex; gap: 8px; align-items: stretch; }
-        .qr-btns .btn { display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.2; }
+        .qr-btns { display: flex; gap: 8px; align-items: stretch; position: sticky; bottom: 0; background: var(--surface); padding: 12px 0 4px; margin: 0 -20px -20px; padding-left: 20px; padding-right: 20px; border-top: 1px solid var(--border); }
+        .qr-btns .btn { display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.2; min-width: 0; }
         .qr-score-box { margin-top: 14px; padding: 16px; background: var(--success-bg); border: 1px solid rgba(45,122,79,0.3); border-radius: 10px; text-align: center; }
         .qr-score-pct { font-size: 36px; font-weight: 700; color: var(--success); line-height: 1; }
         .qr-score-label { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
@@ -2247,19 +2247,12 @@
         // Only reprepare if not already done (preserve answered state across tab switches)
         if (qrPrepared.length === qs.questions.length) return;
         qrPrepared = qs.questions.map(q => {
-            // Build options array
-            let opts = [];
-            if (q.format === 'true_false') {
-                opts = [{text:'True', correct: q.answer === 'True'}, {text:'False', correct: q.answer === 'False'}];
-            } else {
-                // mcq_4 or mcq_5: options are A/B/C/D/E in q.options
-                const letters = Object.keys(q.options || {});
-                opts = letters.map(l => ({ text: q.options[l], correct: l === q.answer }));
-                // Shuffle
-                for (let i = opts.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [opts[i], opts[j]] = [opts[j], opts[i]];
-                }
+            // q.options is an array; q.correct_index is the index of the correct answer
+            const opts = (q.options || []).map((text, i) => ({ text, correct: i === q.correct_index }));
+            // Shuffle (Fisher-Yates), preserving correctness flag
+            for (let i = opts.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [opts[i], opts[j]] = [opts[j], opts[i]];
             }
             return { q, options: opts, picked: null, answered: false };
         });
