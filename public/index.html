@@ -759,9 +759,11 @@
     // PIPELINE TIMING & PROGRESS BAR
     // ================================================================
     const TIMING_KEY = 'lingoreader-timing';
+    const CHUNK_MPC_KEY = 'lingoreader-chunk-mpc'; // ms per char history
     let pipelineTimerRAF = null;
     let pipelineStartTime = 0;
     let currentStepKey = null;
+    let chunkCharCount = 0;
 
     function loadTimingHistory() {
         try { return JSON.parse(localStorage.getItem(TIMING_KEY)) || {}; } catch { return {}; }
@@ -782,6 +784,23 @@
         return arr.reduce((a, b) => a + b, 0) / arr.length;
     }
 
+    function getAvgMsPerChar() {
+        try {
+            const arr = JSON.parse(localStorage.getItem(CHUNK_MPC_KEY)) || [];
+            if (!arr.length) return 150; // default: 120000ms / 800 chars
+            return arr.reduce((a, b) => a + b, 0) / arr.length;
+        } catch { return 150; }
+    }
+
+    function saveChunkMpc(mpc) {
+        try {
+            const arr = JSON.parse(localStorage.getItem(CHUNK_MPC_KEY)) || [];
+            arr.push(mpc);
+            if (arr.length > 5) arr.splice(0, arr.length - 5);
+            localStorage.setItem(CHUNK_MPC_KEY, JSON.stringify(arr));
+        } catch {}
+    }
+
     function formatTime(ms) {
         const s = Math.floor(ms / 1000);
         const m = Math.floor(s / 60);
@@ -789,10 +808,10 @@
         return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
     }
 
-    function startPipelineTimer(stepKey) {
+    function startPipelineTimer(stepKey, estimatedMs) {
         currentStepKey = stepKey;
         pipelineStartTime = Date.now();
-        const avgMs = getAverageMs(stepKey);
+        const avgMs = estimatedMs !== undefined ? estimatedMs : getAverageMs(stepKey);
         $('progress-bar-wrap').style.display = 'block';
         $('progress-timer').style.display = 'block';
         $('progress-bar-fill').style.width = '0%';
@@ -818,9 +837,14 @@
     function stopPipelineTimer() {
         if (pipelineTimerRAF) { cancelAnimationFrame(pipelineTimerRAF); pipelineTimerRAF = null; }
         const elapsed = Date.now() - pipelineStartTime;
-        if (currentStepKey && elapsed > 0) saveTimingEntry(currentStepKey, elapsed);
+        if (currentStepKey && elapsed > 0) {
+            saveTimingEntry(currentStepKey, elapsed);
+            if (currentStepKey === 'chunk' && chunkCharCount > 0) {
+                saveChunkMpc(elapsed / chunkCharCount);
+                chunkCharCount = 0;
+            }
+        }
         $('progress-bar-fill').style.width = '100%';
-        const stepKey = currentStepKey;
         currentStepKey = null;
         return elapsed;
     }
@@ -871,7 +895,8 @@
             if (needsChunking) {
                 setStatus('Sending text to OpenAI for chunking & translation…', 'loading');
                 setProgress('chunk');
-                startPipelineTimer('chunk');
+                chunkCharCount = sourceText.length;
+                startPipelineTimer('chunk', sourceText.length * getAvgMsPerChar());
 
                 // Start async job
                 const startRes = await authedFetch('/api/chunk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceText }) });
