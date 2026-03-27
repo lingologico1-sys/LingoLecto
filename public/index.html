@@ -1658,7 +1658,11 @@
         if (titleEl && !titleEl.value) {
             titleEl.value = state.title || $('data-title').value || '';
         }
-        if (questionsData) renderQuestionsPanel(questionsData);
+        if (questionsData) {
+            renderQuestionsPanel(questionsData);
+        } else if (state.questionsData && state.questionsData.questions && state.questionsData.questions.length) {
+            renderQuestionsPanel(state.questionsData);
+        }
     }
 
     $('btn-generate-questions').addEventListener('click', async () => {
@@ -1724,6 +1728,8 @@
         }
         updateQStats();
         $('q-questions-area').style.display = 'block';
+        $('btn-add-questions').textContent = state.questionsData && state.questionsData.questions && state.questionsData.questions.length
+            ? 'Update Lecto Questions' : 'Add Questions to this Lecto';
     }
 
     function buildQCard(q) {
