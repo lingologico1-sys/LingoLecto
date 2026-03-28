@@ -121,6 +121,8 @@
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
         .chunk.chunk-hover { background: var(--accent-glow); color: var(--accent); }
+        .dict-word-highlight { background: rgba(194,112,62,0.15); border-bottom: 2px solid var(--accent); border-radius: 2px; padding-bottom: 1px; animation: dictHighlightFade 3s ease-out forwards; }
+        @keyframes dictHighlightFade { 0% { background: rgba(194,112,62,0.2); } 70% { background: rgba(194,112,62,0.12); } 100% { background: transparent; border-color: transparent; } }
         .chunk.tapped { background: rgba(194,112,62,0.08); border-bottom: 2px solid var(--accent); padding-bottom: 0; }
         .chunk.active-audio { background: rgba(26,26,46,0.08); transition: background 0.1s; }
 
@@ -2559,7 +2561,34 @@
             while (start > 0 && wordRe.test(text[start - 1])) start--;
             while (end < text.length && wordRe.test(text[end])) end++;
             const word = text.slice(start, end).replace(/^['-]+|['-]+$/g, '');
-            return word || null;
+            if (!word) return null;
+            // Return word + range info for highlighting
+            const wordRange = document.createRange();
+            wordRange.setStart(textNode, start);
+            wordRange.setEnd(textNode, end);
+            return { word, range: wordRange };
+        }
+
+        function highlightWord(wordRange) {
+            // Remove any previous long-press highlight
+            document.querySelectorAll('.dict-word-highlight').forEach(el => {
+                const parent = el.parentNode;
+                while (el.firstChild) parent.insertBefore(el.firstChild, el);
+                parent.removeChild(el);
+                parent.normalize();
+            });
+            const span = document.createElement('span');
+            span.className = 'dict-word-highlight';
+            wordRange.surroundContents(span);
+            // Auto-remove after 3s
+            setTimeout(() => {
+                if (span.parentNode) {
+                    const parent = span.parentNode;
+                    while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                    parent.removeChild(span);
+                    parent.normalize();
+                }
+            }, 3000);
         }
 
         function startPress(e) {
@@ -2570,11 +2599,12 @@
             pressX = pt.clientX; pressY = pt.clientY;
             timer = setTimeout(() => {
                 fired = true;
-                const word = getWordAtPoint(pressX, pressY);
-                if (!word) return;
+                const result = getWordAtPoint(pressX, pressY);
+                if (!result) return;
+                highlightWord(result.range);
                 // Gather surrounding sentence as context for idiom detection
                 const chunkText = (chunk.textContent || '').trim();
-                dictLookupWord(word, chunkText);
+                dictLookupWord(result.word, chunkText);
             }, DELAY);
         }
 
