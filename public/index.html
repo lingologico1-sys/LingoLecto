@@ -2617,10 +2617,13 @@
             if (!chunk) return;
             hoverEl = chunk;
             chunk.classList.add('chunk-hover');
-            hoverTimer = setTimeout(() => {
-                if (hoverEl) hoverEl.classList.remove('chunk-hover');
-                hoverEl = null; hoverTimer = null;
-            }, 2000);
+            const aud = document.getElementById(activeAudioId);
+            if (aud && !aud.paused) {
+                hoverTimer = setTimeout(() => {
+                    if (hoverEl) hoverEl.classList.remove('chunk-hover');
+                    hoverEl = null; hoverTimer = null;
+                }, 2000);
+            }
         });
         document.addEventListener('mouseout', (e) => {
             const chunk = e.target.closest('.chunk');
