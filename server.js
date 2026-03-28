@@ -22,6 +22,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Environment variables ────────────────────────────────────────────────
 const ELEVEN_API_KEY = process.env.ELEVEN_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
 const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
 const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
@@ -611,11 +612,108 @@ app.post('/api/generate', requireAuth, async (req, res) => {
     }
 });
 
+// ── Dictionary (Gemini) ─────────────────────────────────────────────────
+const { GoogleGenAI } = require('@google/genai');
+
+app.post('/api/dictionary', async (req, res) => {
+    if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+    const { term, language_b } = req.body;
+    if (!term) return res.status(400).json({ error: 'term is required' });
+    const langB = language_b || 'English';
+
+    const schema = {
+        type: 'object',
+        properties: {
+            term: { type: 'string' },
+            language_a: { type: 'string' },
+            language_b: { type: 'string' },
+            entries: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        part_of_speech: { type: 'string' },
+                        is_verb: { type: 'boolean' },
+                        definitions: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    translation: { type: 'string' },
+                                    example_a: { type: 'string' },
+                                    example_b: { type: 'string' },
+                                    grammar_explanation: { type: 'string' }
+                                },
+                                required: ['translation', 'example_a', 'example_b', 'grammar_explanation']
+                            }
+                        },
+                        verb_details: {
+                            type: 'object',
+                            properties: {
+                                conjugation_current: { type: 'array', items: { type: 'string' } },
+                                conjugation_present: { type: 'array', items: { type: 'string' } }
+                            },
+                            required: ['conjugation_current', 'conjugation_present']
+                        }
+                    },
+                    required: ['part_of_speech', 'is_verb', 'definitions']
+                }
+            }
+        },
+        required: ['term', 'language_a', 'language_b', 'entries']
+    };
+
+    const systemPrompt = `You are a highly efficient dictionary API. The user will provide a French word or structure (Language A). You must analyze it and provide a breakdown translated into ${langB} (Language B / the user's first language). Identify up to 3 most common parts of speech. For each part of speech, provide up to 3 definitions ordered by most common usage. If the word is a verb, identify tense/mode and provide 6-form conjugations in French (1s, 2s, 3s, 1p, 2p, 3p), omitting pronouns. Example sentences (example_a) must be in French. Their translations (example_b) must be in ${langB}.`;
+
+    const fewShotUser = `Look up: "vais" (French → English)`;
+    const fewShotModel = JSON.stringify({
+        term: "vais",
+        language_a: "French",
+        language_b: "English",
+        entries: [{
+            part_of_speech: "verb (aller — present indicative, 1st person singular)",
+            is_verb: true,
+            definitions: [
+                { translation: "to go", example_a: "Je vais au marché.", example_b: "I am going to the market.", grammar_explanation: "'Vais' is the first-person singular present indicative form of 'aller' (to go). 'Aller' is an irregular verb." },
+                { translation: "to be going to (near future)", example_a: "Je vais manger.", example_b: "I am going to eat.", grammar_explanation: "'Aller' + infinitive forms the near future tense (futur proche)." }
+            ],
+            verb_details: {
+                conjugation_current: ["vais", "vas", "va", "allons", "allez", "vont"],
+                conjugation_present: ["vais", "vas", "va", "allons", "allez", "vont"]
+            }
+        }]
+    });
+
+    try {
+        const genai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+        const result = await genai.models.generateContent({
+            model: 'gemini-2.5-flash-lite',
+            contents: [
+                { role: 'user', parts: [{ text: fewShotUser }] },
+                { role: 'model', parts: [{ text: fewShotModel }] },
+                { role: 'user', parts: [{ text: `Look up: "${term}" (French → ${langB})` }] }
+            ],
+            config: {
+                systemInstruction: systemPrompt,
+                temperature: 0.3,
+                responseMimeType: 'application/json',
+                responseSchema: schema
+            }
+        });
+        const data = JSON.parse(result.text);
+        res.json(data);
+    } catch (err) {
+        console.error('Dictionary error:', err);
+        res.status(500).json({ error: err.message || 'Dictionary lookup failed' });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     if (!ELEVEN_API_KEY) console.warn('⚠️  ELEVEN_API_KEY is not set!');
     if (!OPENAI_API_KEY) console.warn('⚠️  OPENAI_API_KEY is not set!');
+    if (!GEMINI_API_KEY) console.warn('⚠️  GEMINI_API_KEY is not set!');
     if (!R2_ACCESS_KEY_ID) console.warn('⚠️  R2_ACCESS_KEY_ID is not set!');
     else console.log('R2 config: account=' + R2_ACCOUNT_ID.slice(0,4) + '..., key=' + R2_ACCESS_KEY_ID.slice(0,4) + '..., secret=' + R2_SECRET_ACCESS_KEY.slice(0,4) + '...');
 });
