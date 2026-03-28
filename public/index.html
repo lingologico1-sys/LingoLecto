@@ -2609,38 +2609,48 @@
     (function initChunkHover() {
         let hoverTimer = null;
         let hoverEl = null;
+        let hoverDismissed = false; // true once auto-hidden; reset on mouseout
 
         function startAutoHide() {
             if (hoverTimer) clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => {
                 if (hoverEl) hoverEl.classList.remove('chunk-hover');
-                hoverEl = null; hoverTimer = null;
+                hoverDismissed = true;
+                hoverTimer = null;
             }, 2000);
         }
 
-        document.addEventListener('mouseover', (e) => {
-            const chunk = e.target.closest('.chunk');
-            if (chunk === hoverEl) return;
-            if (hoverEl) { hoverEl.classList.remove('chunk-hover'); hoverEl = null; }
-            if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
-            if (!chunk) return;
-            hoverEl = chunk;
-            chunk.classList.add('chunk-hover');
+        function isAudioPlaying() {
             const aud = document.getElementById(activeAudioId);
-            if (aud && !aud.paused) startAutoHide();
-        });
-        document.addEventListener('mouseout', (e) => {
-            const chunk = e.target.closest('.chunk');
-            if (chunk && chunk === hoverEl) {
-                chunk.classList.remove('chunk-hover');
+            return aud && !aud.paused;
+        }
+
+        document.addEventListener('mouseenter', (e) => {
+            if (!e.target.classList || !e.target.classList.contains('chunk')) return;
+            const chunk = e.target;
+            if (chunk === hoverEl) return;
+            // Clean up previous
+            if (hoverEl) hoverEl.classList.remove('chunk-hover');
+            if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+            hoverEl = chunk;
+            hoverDismissed = false;
+            chunk.classList.add('chunk-hover');
+            if (isAudioPlaying()) startAutoHide();
+        }, true);
+
+        document.addEventListener('mouseleave', (e) => {
+            if (!e.target.classList || !e.target.classList.contains('chunk')) return;
+            if (e.target === hoverEl) {
+                hoverEl.classList.remove('chunk-hover');
                 hoverEl = null;
+                hoverDismissed = false;
                 if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
             }
-        });
+        }, true);
 
         // If audio starts while mouse is already on a chunk, start the timer
         document.addEventListener('play', () => {
-            if (hoverEl && !hoverTimer) startAutoHide();
+            if (hoverEl && !hoverTimer && !hoverDismissed) startAutoHide();
         }, true);
     })();
 
