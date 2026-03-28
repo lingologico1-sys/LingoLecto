@@ -223,18 +223,21 @@
         .dict-empty { color: var(--text-secondary); font-size: 13px; text-align: center; padding: 32px 16px; }
         .dict-loading { text-align: center; padding: 32px 16px; color: var(--text-secondary); font-size: 13px; }
         .dict-term { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }
-        .dict-entry { margin-bottom: 18px; }
-        .dict-pos { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 8px; }
-        .dict-def { margin-bottom: 12px; padding-left: 10px; border-left: 3px solid var(--border-light); }
-        .dict-translation { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
-        .dict-example { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 2px; font-style: italic; }
-        .dict-example-b { font-style: normal; color: var(--ink); opacity: 0.7; }
-        .dict-grammar { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; }
-        .dict-conj { margin-top: 10px; }
-        .dict-conj-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); margin-bottom: 6px; }
-        .dict-conj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 13px; }
-        .dict-conj-grid span { padding: 3px 0; color: var(--ink); }
-        .dict-conj-grid .conj-label { color: var(--text-secondary); font-size: 11px; }
+        .dict-entry { margin-bottom: 20px; }
+        .dict-pos { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 10px; }
+        .dict-def { margin-bottom: 14px; padding: 10px 12px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border-light); }
+        .dict-translation { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+        .dict-example-a { font-size: 13px; color: var(--ink); line-height: 1.5; font-style: italic; margin-bottom: 3px; }
+        .dict-example-a b { font-weight: 700; color: var(--accent-deep, var(--accent)); }
+        .dict-example-b { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px; }
+        .dict-example-b b { font-weight: 600; }
+        .dict-grammar { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding-top: 8px; border-top: 1px solid var(--border-light); }
+        .dict-conj { margin-top: 12px; padding: 10px 12px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border-light); }
+        .dict-conj-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); margin-bottom: 8px; }
+        .dict-conj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 20px; font-size: 13px; }
+        .dict-conj-grid .conj-row { display: flex; gap: 6px; padding: 3px 0; }
+        .dict-conj-grid .conj-pronoun { color: var(--text-secondary); min-width: 28px; font-size: 12px; }
+        .dict-conj-grid .conj-form { color: var(--ink); font-weight: 600; }
         .dict-error { color: var(--error); font-size: 13px; text-align: center; padding: 24px 16px; }
 
         @media (max-width: 800px) { .questioner-wrap { grid-template-columns: 1fr; height: auto; overflow: visible; } .questioner-right { height: 60vh; } }
@@ -2431,7 +2434,27 @@
     // ================================================================
     // DICTIONARY
     // ================================================================
-    const CONJ_LABELS = ['1s', '2s', '3s', '1p', '2p', '3p'];
+    const CONJ_PRONOUNS = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
+    // Order: 1s, 2s, 3s, 1p, 2p, 3p → display as je, tu, il/elle, nous, vous, ils/elles
+    const CONJ_ORDER = [0, 1, 2, 3, 4, 5];
+
+    // Bold the looked-up term within example text (case-insensitive, accent-aware)
+    function boldTerm(text, term) {
+        if (!term) return escapeHtml(text);
+        const escaped = escapeHtml(text);
+        const termEsc = escapeHtml(term);
+        const re = new RegExp(`(${termEsc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return escaped.replace(re, '<b>$1</b>');
+    }
+
+    function renderConjGrid(forms, label) {
+        let html = `<div class="dict-conj"><div class="dict-conj-label">${escapeHtml(label)}</div><div class="dict-conj-grid">`;
+        for (const i of CONJ_ORDER) {
+            html += `<div class="conj-row"><span class="conj-pronoun">${CONJ_PRONOUNS[i]}</span><span class="conj-form">${escapeHtml(forms[i])}</span></div>`;
+        }
+        html += `</div></div>`;
+        return html;
+    }
 
     function renderDictResult(data) {
         const res = $('dict-results');
@@ -2439,34 +2462,27 @@
             res.innerHTML = '<div class="dict-empty">No results found.</div>';
             return;
         }
-        let html = `<div class="dict-term">${escapeHtml(data.term)}</div>`;
+        const term = data.term || '';
+        let html = `<div class="dict-term">${escapeHtml(term)}</div>`;
         for (const entry of data.entries) {
             html += `<div class="dict-entry"><div class="dict-pos">${escapeHtml(entry.part_of_speech)}</div>`;
             for (const def of (entry.definitions || [])) {
                 html += `<div class="dict-def">
                     <div class="dict-translation">${escapeHtml(def.translation)}</div>
-                    <div class="dict-example">${escapeHtml(def.example_a)}</div>
-                    <div class="dict-example dict-example-b">${escapeHtml(def.example_b)}</div>
+                    <div class="dict-example-a">${boldTerm(def.example_a, term)}</div>
+                    <div class="dict-example-b">${boldTerm(def.example_b, def.translation)}</div>
                     <div class="dict-grammar">${escapeHtml(def.grammar_explanation)}</div>
                 </div>`;
             }
             if (entry.is_verb && entry.verb_details) {
                 const vd = entry.verb_details;
                 if (vd.conjugation_current && vd.conjugation_current.length === 6) {
-                    const label = vd.conjugation_current.join(',') === vd.conjugation_present.join(',') ? 'Present' : 'Detected tense';
-                    html += `<div class="dict-conj"><div class="dict-conj-label">${label}</div><div class="dict-conj-grid">`;
-                    for (let i = 0; i < 6; i++) {
-                        html += `<span><span class="conj-label">${CONJ_LABELS[i]}</span> ${escapeHtml(vd.conjugation_current[i])}</span>`;
-                    }
-                    html += `</div></div>`;
+                    const same = vd.conjugation_present && vd.conjugation_current.join(',') === vd.conjugation_present.join(',');
+                    html += renderConjGrid(vd.conjugation_current, same ? 'Present' : 'Detected tense');
                 }
                 if (vd.conjugation_present && vd.conjugation_present.length === 6 &&
-                    vd.conjugation_current.join(',') !== vd.conjugation_present.join(',')) {
-                    html += `<div class="dict-conj"><div class="dict-conj-label">Present</div><div class="dict-conj-grid">`;
-                    for (let i = 0; i < 6; i++) {
-                        html += `<span><span class="conj-label">${CONJ_LABELS[i]}</span> ${escapeHtml(vd.conjugation_present[i])}</span>`;
-                    }
-                    html += `</div></div>`;
+                    (!vd.conjugation_current || vd.conjugation_current.join(',') !== vd.conjugation_present.join(','))) {
+                    html += renderConjGrid(vd.conjugation_present, 'Present');
                 }
             }
             html += `</div>`;
