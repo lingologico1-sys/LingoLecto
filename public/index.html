@@ -120,7 +120,7 @@
         .reader-text { font-family: 'Lora', Georgia, serif; font-size: 20px; line-height: 1.85; color: var(--ink); letter-spacing: 0.01em; }
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
-        .chunk:hover { background: var(--accent-glow); color: var(--accent); }
+        .chunk.chunk-hover { background: var(--accent-glow); color: var(--accent); }
         .chunk.tapped { background: rgba(194,112,62,0.08); border-bottom: 2px solid var(--accent); padding-bottom: 0; }
         .chunk.active-audio { background: rgba(26,26,46,0.08); transition: background 0.1s; }
 
@@ -2601,6 +2601,35 @@
             qt.addEventListener('touchend', endPress);
             qt.addEventListener('touchcancel', cancelPress);
         }
+    })();
+
+    // ================================================================
+    // CHUNK HOVER (auto-dismiss after 2s)
+    // ================================================================
+    (function initChunkHover() {
+        let hoverTimer = null;
+        let hoverEl = null;
+        document.addEventListener('mouseover', (e) => {
+            const chunk = e.target.closest('.chunk');
+            if (chunk === hoverEl) return;
+            if (hoverEl) { hoverEl.classList.remove('chunk-hover'); hoverEl = null; }
+            if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+            if (!chunk) return;
+            hoverEl = chunk;
+            chunk.classList.add('chunk-hover');
+            hoverTimer = setTimeout(() => {
+                if (hoverEl) hoverEl.classList.remove('chunk-hover');
+                hoverEl = null; hoverTimer = null;
+            }, 2000);
+        });
+        document.addEventListener('mouseout', (e) => {
+            const chunk = e.target.closest('.chunk');
+            if (chunk && chunk === hoverEl) {
+                chunk.classList.remove('chunk-hover');
+                hoverEl = null;
+                if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+            }
+        });
     })();
 
     // ================================================================
