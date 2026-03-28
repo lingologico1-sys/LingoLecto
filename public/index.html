@@ -2500,6 +2500,62 @@
         if (e.key === 'Enter') { e.preventDefault(); dictLookup(); }
     });
 
+    // Switch to dictionary tab and look up a word
+    function dictLookupWord(word) {
+        // Switch to dictionary tab
+        document.querySelectorAll('.qr-tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('.qr-tab[data-qrtab="dictionary"]').classList.add('active');
+        document.querySelectorAll('.qr-tab-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('qr-tab-dictionary').classList.add('active');
+        // Fill input and trigger lookup
+        const inp = $('dict-input');
+        inp.value = word;
+        inp.focus();
+        dictLookup();
+    }
+
+    // Long-press on chunks to look up words in dictionary
+    (function initLongPress() {
+        let timer = null;
+        let fired = false;
+        const DELAY = 500; // ms
+
+        function startPress(e) {
+            const chunk = e.target.closest('.chunk');
+            if (!chunk) return;
+            fired = false;
+            timer = setTimeout(() => {
+                fired = true;
+                const text = (chunk.textContent || '').trim().replace(/[.,;:!?«»""''()\[\]…—–\-]/g, '').trim();
+                if (text) dictLookupWord(text);
+            }, DELAY);
+        }
+
+        function cancelPress() {
+            if (timer) { clearTimeout(timer); timer = null; }
+        }
+
+        function endPress(e) {
+            cancelPress();
+            // If long press fired, prevent the normal click/tooltip
+            if (fired) { e.preventDefault(); e.stopPropagation(); fired = false; }
+        }
+
+        // Apply to questioner text area
+        const qt = $('questioner-left');
+        if (qt) {
+            qt.addEventListener('mousedown', startPress);
+            qt.addEventListener('mousemove', cancelPress);
+            qt.addEventListener('mouseup', endPress);
+            qt.addEventListener('mouseleave', cancelPress);
+            // Touch support
+            qt.addEventListener('touchstart', startPress, { passive: true });
+            qt.addEventListener('touchmove', cancelPress);
+            qt.addEventListener('touchend', endPress);
+            qt.addEventListener('touchcancel', cancelPress);
+        }
+    })();
+
     // ================================================================
     // TOOLTIP
     // ================================================================
