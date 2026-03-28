@@ -2435,8 +2435,8 @@
     // DICTIONARY
     // ================================================================
     const CONJ_PRONOUNS = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
-    // Order: 1s, 2s, 3s, 1p, 2p, 3p → display as je, tu, il/elle, nous, vous, ils/elles
-    const CONJ_ORDER = [0, 1, 2, 3, 4, 5];
+    // Pair singular with plural: je/nous, tu/vous, il/ils (standard textbook layout)
+    const CONJ_PAIRS = [[0, 3], [1, 4], [2, 5]];
 
     // Bold the looked-up term within example text (case-insensitive, accent-aware)
     function boldTerm(text, term) {
@@ -2449,8 +2449,9 @@
 
     function renderConjGrid(forms, label) {
         let html = `<div class="dict-conj"><div class="dict-conj-label">${escapeHtml(label)}</div><div class="dict-conj-grid">`;
-        for (const i of CONJ_ORDER) {
-            html += `<div class="conj-row"><span class="conj-pronoun">${CONJ_PRONOUNS[i]}</span><span class="conj-form">${escapeHtml(forms[i])}</span></div>`;
+        for (const [s, p] of CONJ_PAIRS) {
+            html += `<div class="conj-row"><span class="conj-pronoun">${CONJ_PRONOUNS[s]}</span><span class="conj-form">${escapeHtml(forms[s])}</span></div>`;
+            html += `<div class="conj-row"><span class="conj-pronoun">${CONJ_PRONOUNS[p]}</span><span class="conj-form">${escapeHtml(forms[p])}</span></div>`;
         }
         html += `</div></div>`;
         return html;
