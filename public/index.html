@@ -2485,7 +2485,7 @@
             const resp = await fetch('/api/dictionary', {
                 method: 'POST',
                 headers: authHeaders({ 'Content-Type': 'application/json' }),
-                body: JSON.stringify({ term, language_b: langB })
+                body: JSON.stringify({ term, language_b: langB, context: _dictContext || undefined })
             });
             if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
             const data = await resp.json();
@@ -2495,13 +2495,14 @@
         }
     }
 
-    $('dict-search-btn').addEventListener('click', dictLookup);
+    $('dict-search-btn').addEventListener('click', () => { _dictContext = ''; dictLookup(); });
     $('dict-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); dictLookup(); }
+        if (e.key === 'Enter') { e.preventDefault(); _dictContext = ''; dictLookup(); }
     });
 
     // Switch to dictionary tab and look up a word
-    function dictLookupWord(word) {
+    let _dictContext = '';
+    function dictLookupWord(word, context) {
         // Switch to dictionary tab
         document.querySelectorAll('.qr-tab').forEach(t => t.classList.remove('active'));
         document.querySelector('.qr-tab[data-qrtab="dictionary"]').classList.add('active');
@@ -2511,6 +2512,7 @@
         const inp = $('dict-input');
         inp.value = word;
         inp.focus();
+        _dictContext = context || '';
         dictLookup();
     }
 
@@ -2518,16 +2520,43 @@
     (function initLongPress() {
         let timer = null;
         let fired = false;
+        let pressX = 0, pressY = 0;
         const DELAY = 500; // ms
+
+        function getWordAtPoint(x, y) {
+            let range;
+            if (document.caretRangeFromPoint) {
+                range = document.caretRangeFromPoint(x, y);
+            } else if (document.caretPositionFromPoint) {
+                const pos = document.caretPositionFromPoint(x, y);
+                if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
+            }
+            if (!range || range.startContainer.nodeType !== Node.TEXT_NODE) return null;
+            const textNode = range.startContainer;
+            const text = textNode.textContent;
+            const offset = range.startOffset;
+            // Find word boundaries (letters, accented chars, hyphens, apostrophes)
+            const wordRe = /[\p{L}\p{M}'-]/u;
+            let start = offset, end = offset;
+            while (start > 0 && wordRe.test(text[start - 1])) start--;
+            while (end < text.length && wordRe.test(text[end])) end++;
+            const word = text.slice(start, end).replace(/^['-]+|['-]+$/g, '');
+            return word || null;
+        }
 
         function startPress(e) {
             const chunk = e.target.closest('.chunk');
             if (!chunk) return;
             fired = false;
+            const pt = e.touches ? e.touches[0] : e;
+            pressX = pt.clientX; pressY = pt.clientY;
             timer = setTimeout(() => {
                 fired = true;
-                const text = (chunk.textContent || '').trim().replace(/[.,;:!?«»""''()\[\]…—–\-]/g, '').trim();
-                if (text) dictLookupWord(text);
+                const word = getWordAtPoint(pressX, pressY);
+                if (!word) return;
+                // Gather surrounding sentence as context for idiom detection
+                const chunkText = (chunk.textContent || '').trim();
+                dictLookupWord(word, chunkText);
             }, DELAY);
         }
 

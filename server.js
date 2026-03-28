@@ -620,7 +620,7 @@ app.post('/api/dictionary', async (req, res) => {
         console.error('Dictionary request failed: GEMINI_API_KEY is empty. process.env.GEMINI_API_KEY =', process.env.GEMINI_API_KEY ? `set (${process.env.GEMINI_API_KEY.length} chars)` : 'undefined');
         return res.status(500).json({ error: 'GEMINI_API_KEY not configured — redeploy after adding the env var on Render' });
     }
-    const { term, language_b } = req.body;
+    const { term, language_b, context } = req.body;
     if (!term) return res.status(400).json({ error: 'term is required' });
     const langB = language_b || 'English';
 
@@ -666,7 +666,9 @@ app.post('/api/dictionary', async (req, res) => {
         required: ['term', 'language_a', 'language_b', 'entries']
     };
 
-    const systemPrompt = `You are a highly efficient dictionary API. The user will provide a French word or structure (Language A). You must analyze it and provide a breakdown translated into ${langB} (Language B / the user's first language). Identify up to 3 most common parts of speech. For each part of speech, provide up to 3 definitions ordered by most common usage. If the word is a verb, identify tense/mode and provide 6-form conjugations in French (1s, 2s, 3s, 1p, 2p, 3p), omitting pronouns. Example sentences (example_a) must be in French. Their translations (example_b) must be in ${langB}.`;
+    const systemPrompt = `You are a highly efficient dictionary API. The user will provide a French word or structure (Language A), sometimes with surrounding sentence context. You must analyze it and provide a breakdown translated into ${langB} (Language B / the user's first language). Identify up to 3 most common parts of speech. For each part of speech, provide up to 3 definitions ordered by most common usage. If the word is a verb, identify tense/mode and provide 6-form conjugations in French (1s, 2s, 3s, 1p, 2p, 3p), omitting pronouns. Example sentences (example_a) must be in French. Their translations (example_b) must be in ${langB}.
+
+IMPORTANT: If context is provided, check whether the word is part of an idiomatic expression, phrasal verb, or typically paired with a preposition in that context (e.g. "avoir besoin de", "faire partie de", "en train de"). If so, set the "term" field in your response to the full phrase (not just the single word), and provide definitions for the phrase. If the word stands alone, just define the single word.`;
 
     const fewShotUser = `Look up: "vais" (French → English)`;
     const fewShotModel = JSON.stringify({
@@ -694,7 +696,9 @@ app.post('/api/dictionary', async (req, res) => {
             contents: [
                 { role: 'user', parts: [{ text: fewShotUser }] },
                 { role: 'model', parts: [{ text: fewShotModel }] },
-                { role: 'user', parts: [{ text: `Look up: "${term}" (French → ${langB})` }] }
+                { role: 'user', parts: [{ text: context
+                    ? `Look up: "${term}" in context: "${context}" (French → ${langB})`
+                    : `Look up: "${term}" (French → ${langB})` }] }
             ],
             config: {
                 systemInstruction: systemPrompt,
