@@ -2607,9 +2607,13 @@
     // TOOLTIP
     // ================================================================
     const tooltipEl = $('tooltip');
+    let tooltipAutoHideTimer = null;
     function showTooltip(element, chunk) {
+        if (tooltipAutoHideTimer) { clearTimeout(tooltipAutoHideTimer); tooltipAutoHideTimer = null; }
         const aud = document.getElementById(activeAudioId);
+        let wasPlaying = false;
         if (aud) {
+            wasPlaying = !aud.paused;
             if (!aud.paused) aud.pause();
             if (chunk.audioStart !== null && chunk.audioStart !== undefined) {
                 navLock = true;
@@ -2627,8 +2631,16 @@
         let top = tr.top - ttr.height - 12; let left = tr.left + (tr.width / 2) - (ttr.width / 2); if (left < 16) left = 16; if (left + ttr.width > window.innerWidth - 16) left = window.innerWidth - ttr.width - 16; if (top < 80) top = tr.bottom + 12;
         tooltipEl.style.top = `${top}px`; tooltipEl.style.left = `${left}px`;
         if (!state.tappedIds.has(chunk.id)) { state.tapCount++; state.tappedIds.add(chunk.id); $('tapCount').textContent = state.tapCount; $('uniqueCount').textContent = state.tappedIds.size; saveState(); }
+        // Auto-dismiss after 2s if audio was playing, then resume
+        if (wasPlaying) {
+            tooltipAutoHideTimer = setTimeout(() => {
+                tooltipAutoHideTimer = null;
+                hideTooltip();
+                if (aud && aud.paused) aud.play();
+            }, 2000);
+        }
     }
-    function hideTooltip() { tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } tapResumeTime = null; }
+    function hideTooltip() { if (tooltipAutoHideTimer) { clearTimeout(tooltipAutoHideTimer); tooltipAutoHideTimer = null; } tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } tapResumeTime = null; }
     document.addEventListener('click', (e) => { if (tooltipEl.classList.contains('visible') && !e.target.closest('.chunk') && !e.target.closest('.tooltip')) hideTooltip(); });
     window.addEventListener('scroll', hideTooltip, { passive: true });
     window.addEventListener('resize', hideTooltip, { passive: true });
