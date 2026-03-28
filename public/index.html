@@ -2609,6 +2609,15 @@
     (function initChunkHover() {
         let hoverTimer = null;
         let hoverEl = null;
+
+        function startAutoHide() {
+            if (hoverTimer) clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(() => {
+                if (hoverEl) hoverEl.classList.remove('chunk-hover');
+                hoverEl = null; hoverTimer = null;
+            }, 2000);
+        }
+
         document.addEventListener('mouseover', (e) => {
             const chunk = e.target.closest('.chunk');
             if (chunk === hoverEl) return;
@@ -2618,12 +2627,7 @@
             hoverEl = chunk;
             chunk.classList.add('chunk-hover');
             const aud = document.getElementById(activeAudioId);
-            if (aud && !aud.paused) {
-                hoverTimer = setTimeout(() => {
-                    if (hoverEl) hoverEl.classList.remove('chunk-hover');
-                    hoverEl = null; hoverTimer = null;
-                }, 2000);
-            }
+            if (aud && !aud.paused) startAutoHide();
         });
         document.addEventListener('mouseout', (e) => {
             const chunk = e.target.closest('.chunk');
@@ -2633,6 +2637,11 @@
                 if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
             }
         });
+
+        // If audio starts while mouse is already on a chunk, start the timer
+        document.addEventListener('play', () => {
+            if (hoverEl && !hoverTimer) startAutoHide();
+        }, true);
     })();
 
     // ================================================================
