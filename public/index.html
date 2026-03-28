@@ -2344,6 +2344,18 @@
                 renderQrQuestion();
             });
         });
+
+        // Enter key submits the current answer
+        if (!document._qrEnterBound) {
+            document._qrEnterBound = true;
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter') return;
+                const cur = qrPrepared[qrIdx];
+                if (!cur || cur.picked === null || cur.answered) return;
+                cur.answered = true;
+                renderQrQuestion();
+            });
+        }
     }
 
     // ================================================================
