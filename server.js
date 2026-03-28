@@ -616,7 +616,10 @@ app.post('/api/generate', requireAuth, async (req, res) => {
 const { GoogleGenAI } = require('@google/genai');
 
 app.post('/api/dictionary', async (req, res) => {
-    if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+    if (!GEMINI_API_KEY) {
+        console.error('Dictionary request failed: GEMINI_API_KEY is empty. process.env.GEMINI_API_KEY =', process.env.GEMINI_API_KEY ? `set (${process.env.GEMINI_API_KEY.length} chars)` : 'undefined');
+        return res.status(500).json({ error: 'GEMINI_API_KEY not configured — redeploy after adding the env var on Render' });
+    }
     const { term, language_b } = req.body;
     if (!term) return res.status(400).json({ error: 'term is required' });
     const langB = language_b || 'English';
@@ -703,8 +706,9 @@ app.post('/api/dictionary', async (req, res) => {
         const data = JSON.parse(result.text);
         res.json(data);
     } catch (err) {
-        console.error('Dictionary error:', err);
-        res.status(500).json({ error: err.message || 'Dictionary lookup failed' });
+        console.error('Dictionary error:', err.message, err.status || '', err.stack || '');
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || 'Dictionary lookup failed' });
     }
 });
 
@@ -713,7 +717,8 @@ app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     if (!ELEVEN_API_KEY) console.warn('⚠️  ELEVEN_API_KEY is not set!');
     if (!OPENAI_API_KEY) console.warn('⚠️  OPENAI_API_KEY is not set!');
-    if (!GEMINI_API_KEY) console.warn('⚠️  GEMINI_API_KEY is not set!');
+    if (!GEMINI_API_KEY) console.warn('⚠️  GEMINI_API_KEY is not set! (env value:', process.env.GEMINI_API_KEY === undefined ? 'undefined' : 'empty string', ')');
+    else console.log('Gemini API key: ' + GEMINI_API_KEY.slice(0, 6) + '... (' + GEMINI_API_KEY.length + ' chars)');
     if (!R2_ACCESS_KEY_ID) console.warn('⚠️  R2_ACCESS_KEY_ID is not set!');
     else console.log('R2 config: account=' + R2_ACCOUNT_ID.slice(0,4) + '..., key=' + R2_ACCESS_KEY_ID.slice(0,4) + '..., secret=' + R2_SECRET_ACCESS_KEY.slice(0,4) + '...');
 });

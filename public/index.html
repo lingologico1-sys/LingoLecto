@@ -216,9 +216,9 @@
 
         /* Dictionary */
         .dict-search { display: flex; gap: 6px; padding: 12px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-        .dict-input { flex: 1; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; }
+        .dict-input { flex: 1; min-width: 0; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; }
         .dict-input:focus { border-color: var(--accent); }
-        .dict-btn { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+        .dict-btn { flex-shrink: 0; padding: 8px 12px; font-size: 12px; white-space: nowrap; }
         .dict-results { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; }
         .dict-empty { color: var(--text-secondary); font-size: 13px; text-align: center; padding: 32px 16px; }
         .dict-loading { text-align: center; padding: 32px 16px; color: var(--text-secondary); font-size: 13px; }
