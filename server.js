@@ -653,10 +653,11 @@ app.post('/api/dictionary', async (req, res) => {
                         verb_details: {
                             type: 'object',
                             properties: {
+                                infinitive: { type: 'string' },
                                 conjugation_current: { type: 'array', items: { type: 'string' } },
                                 conjugation_present: { type: 'array', items: { type: 'string' } }
                             },
-                            required: ['conjugation_current', 'conjugation_present']
+                            required: ['infinitive', 'conjugation_current', 'conjugation_present']
                         }
                     },
                     required: ['part_of_speech', 'is_verb', 'definitions']
@@ -683,6 +684,7 @@ IMPORTANT: If context is provided, check whether the word is part of an idiomati
                 { translation: "to be going to (near future)", example_a: "Je vais manger.", example_b: "I am going to eat.", grammar_explanation: "'Aller' + infinitive forms the near future tense (futur proche)." }
             ],
             verb_details: {
+                infinitive: "aller",
                 conjugation_current: ["vais", "vas", "va", "allons", "allez", "vont"],
                 conjugation_present: ["vais", "vas", "va", "allons", "allez", "vont"]
             }

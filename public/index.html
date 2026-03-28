@@ -2476,13 +2476,14 @@
             }
             if (entry.is_verb && entry.verb_details) {
                 const vd = entry.verb_details;
+                const inf = vd.infinitive ? ': ' + vd.infinitive.toUpperCase() : '';
                 if (vd.conjugation_current && vd.conjugation_current.length === 6) {
                     const same = vd.conjugation_present && vd.conjugation_current.join(',') === vd.conjugation_present.join(',');
-                    html += renderConjGrid(vd.conjugation_current, same ? 'Present' : 'Detected tense');
+                    html += renderConjGrid(vd.conjugation_current, (same ? 'Present' : 'Detected tense') + inf);
                 }
                 if (vd.conjugation_present && vd.conjugation_present.length === 6 &&
                     (!vd.conjugation_current || vd.conjugation_current.join(',') !== vd.conjugation_present.join(','))) {
-                    html += renderConjGrid(vd.conjugation_present, 'Present');
+                    html += renderConjGrid(vd.conjugation_present, 'Present' + inf);
                 }
             }
             html += `</div>`;
