@@ -121,8 +121,8 @@
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
         .chunk.chunk-hover { background: var(--accent-glow); color: var(--accent); }
-        .dict-word-highlight { background: rgba(194,112,62,0.15); border-bottom: 2px solid var(--accent); border-radius: 2px; padding-bottom: 1px; animation: dictHighlightFade 3s ease-out forwards; }
-        @keyframes dictHighlightFade { 0% { background: rgba(194,112,62,0.2); } 70% { background: rgba(194,112,62,0.12); } 100% { background: transparent; border-color: transparent; } }
+        .dict-word-highlight { border-radius: 3px; padding: 0 1px; animation: dictWordFlash 1.2s ease-out forwards; }
+        @keyframes dictWordFlash { 0% { background: rgba(194,112,62,0.55); outline: 2px solid var(--accent); } 25% { background: rgba(194,112,62,0.4); outline: 2px solid var(--accent); } 100% { background: transparent; outline: 2px solid transparent; } }
         .chunk.tapped { background: rgba(194,112,62,0.08); border-bottom: 2px solid var(--accent); padding-bottom: 0; }
         .chunk.active-audio { background: rgba(26,26,46,0.08); transition: background 0.1s; }
 
@@ -2580,7 +2580,7 @@
             const span = document.createElement('span');
             span.className = 'dict-word-highlight';
             wordRange.surroundContents(span);
-            // Auto-remove after 3s
+            // Auto-remove after animation completes
             setTimeout(() => {
                 if (span.parentNode) {
                     const parent = span.parentNode;
@@ -2588,7 +2588,7 @@
                     parent.removeChild(span);
                     parent.normalize();
                 }
-            }, 3000);
+            }, 1200);
         }
 
         function startPress(e) {
