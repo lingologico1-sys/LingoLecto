@@ -2593,7 +2593,8 @@
 
         function startPress(e) {
             const chunk = e.target.closest('.chunk');
-            if (!chunk) return;
+            const inQrPanel = e.target.closest('#qr-scroll');
+            if (!chunk && !inQrPanel) return;
             fired = false;
             const pt = e.touches ? e.touches[0] : e;
             pressX = pt.clientX; pressY = pt.clientY;
@@ -2603,8 +2604,9 @@
                 if (!result) return;
                 highlightWord(result.range);
                 // Gather surrounding sentence as context for idiom detection
-                const chunkText = (chunk.textContent || '').trim();
-                dictLookupWord(result.word, chunkText);
+                const contextEl = chunk || e.target.closest('.qr-option, .qr-question-text') || e.target;
+                const contextText = (contextEl.textContent || '').trim();
+                dictLookupWord(result.word, contextText);
             }, DELAY);
         }
 
@@ -2618,19 +2620,18 @@
             if (fired) { e.preventDefault(); e.stopPropagation(); fired = false; }
         }
 
-        // Apply to questioner text area
-        const qt = $('questioner-left');
-        if (qt) {
-            qt.addEventListener('mousedown', startPress);
-            qt.addEventListener('mousemove', cancelPress);
-            qt.addEventListener('mouseup', endPress);
-            qt.addEventListener('mouseleave', cancelPress);
-            // Touch support
-            qt.addEventListener('touchstart', startPress, { passive: true });
-            qt.addEventListener('touchmove', cancelPress);
-            qt.addEventListener('touchend', endPress);
-            qt.addEventListener('touchcancel', cancelPress);
-        }
+        // Apply to questioner text area and question panel
+        [$('questioner-left'), $('questioner-right')].forEach(el => {
+            if (!el) return;
+            el.addEventListener('mousedown', startPress);
+            el.addEventListener('mousemove', cancelPress);
+            el.addEventListener('mouseup', endPress);
+            el.addEventListener('mouseleave', cancelPress);
+            el.addEventListener('touchstart', startPress, { passive: true });
+            el.addEventListener('touchmove', cancelPress);
+            el.addEventListener('touchend', endPress);
+            el.addEventListener('touchcancel', cancelPress);
+        });
     })();
 
     // ================================================================
