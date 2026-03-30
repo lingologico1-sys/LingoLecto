@@ -265,6 +265,15 @@
         .vocab-sort-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
         .vocab-sort-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
         .vocab-count { font-size: 12px; color: var(--text-secondary); }
+        .vocab-cats { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .vocab-cat-btn { padding: 3px 10px; font-size: 11px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 99px; background: transparent; color: var(--text-secondary); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+        .vocab-cat-btn.active { color: white; background: var(--accent); border-color: var(--accent); }
+        .vocab-cat-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: var(--border-light); color: var(--text-secondary); flex-shrink: 0; }
+        .vocab-cat-badge.cat-verb { background: rgba(74,86,200,0.1); color: #4a56c8; }
+        .vocab-cat-badge.cat-noun { background: rgba(45,122,79,0.1); color: var(--success); }
+        .vocab-cat-badge.cat-adjective { background: rgba(194,112,62,0.12); color: var(--accent-deep); }
+        .vocab-cat-badge.cat-expression { background: rgba(180,60,180,0.1); color: #a030a0; }
+        .vocab-cat-badge.cat-other { background: var(--border-light); color: var(--text-secondary); }
         .vocab-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 14px; }
         .vocab-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; }
         .vocab-item:hover { border-color: var(--accent); background: var(--accent-glow); }
@@ -480,6 +489,14 @@
                                 <button class="vocab-sort-btn" data-sort="recent">Recent</button>
                             </div>
                             <span class="vocab-count" id="vocab-count">0 words</span>
+                        </div>
+                        <div class="vocab-cats">
+                            <button class="vocab-cat-btn active" data-cat="all">All</button>
+                            <button class="vocab-cat-btn" data-cat="verb">Verb</button>
+                            <button class="vocab-cat-btn" data-cat="noun">Noun</button>
+                            <button class="vocab-cat-btn" data-cat="adjective">Adjective</button>
+                            <button class="vocab-cat-btn" data-cat="expression">Expression</button>
+                            <button class="vocab-cat-btn" data-cat="other">Other</button>
                         </div>
                         <div class="vocab-list" id="vocab-list">
                             <div class="dict-empty">No vocabulary saved yet. Look up a word in the Dictionary and check "Save to My Vocab".</div>
@@ -2785,6 +2802,7 @@
     // ================================================================
     const VOCAB_KEY = 'lingoreader_vocab';
     let vocabSort = 'alpha'; // 'alpha' or 'recent'
+    let vocabCatFilter = 'all';
 
     function vocabLoad() {
         try { return JSON.parse(localStorage.getItem(VOCAB_KEY)) || []; } catch { return []; }
@@ -2792,10 +2810,19 @@
     function vocabSave(list) { localStorage.setItem(VOCAB_KEY, JSON.stringify(list)); }
     function vocabHas(term) { return vocabLoad().some(v => v.term.toLowerCase() === term.toLowerCase()); }
 
+    function vocabCategory(data) {
+        const pos = ((data.entries && data.entries[0] && data.entries[0].part_of_speech) || '').toLowerCase();
+        if (/\bverb\b/.test(pos)) return 'verb';
+        if (/\bnoun\b/.test(pos)) return 'noun';
+        if (/\badj/.test(pos)) return 'adjective';
+        if (/idiom|expression|phrase|proverb|collocation/.test(pos)) return 'expression';
+        return 'other';
+    }
+
     function vocabAdd(data) {
         const list = vocabLoad();
         const idx = list.findIndex(v => v.term.toLowerCase() === data.term.toLowerCase());
-        const entry = { term: data.term, data, addedAt: Date.now() };
+        const entry = { term: data.term, data, addedAt: Date.now(), category: vocabCategory(data) };
         if (idx >= 0) list[idx] = entry; else list.push(entry);
         vocabSave(list);
         renderVocabList();
@@ -2807,6 +2834,8 @@
         renderVocabList();
     }
 
+    const VOCAB_CAT_LABELS = { verb: 'Verb', noun: 'Noun', adjective: 'Adj.', expression: 'Expr.', other: 'Other' };
+
     function renderVocabList() {
         const list = vocabLoad();
         const container = $('vocab-list');
@@ -2815,21 +2844,31 @@
             container.innerHTML = '<div class="dict-empty">No vocabulary saved yet. Look up a word in the Dictionary and check "Save to My Vocab".</div>';
             return;
         }
-        const sorted = [...list];
+        let filtered = vocabCatFilter === 'all' ? list : list.filter(v => (v.category || 'other') === vocabCatFilter);
+        const sorted = [...filtered];
         if (vocabSort === 'alpha') sorted.sort((a, b) => a.term.localeCompare(b.term, 'fr'));
         else sorted.sort((a, b) => b.addedAt - a.addedAt);
+
+        if (!sorted.length) {
+            container.innerHTML = `<div class="dict-empty">No ${vocabCatFilter}s saved yet.</div>`;
+            return;
+        }
 
         let html = '';
         for (const item of sorted) {
             const firstTrans = (item.data.entries && item.data.entries[0] && item.data.entries[0].definitions && item.data.entries[0].definitions[0])
                 ? item.data.entries[0].definitions[0].translation : '';
+            const cat = item.category || 'other';
             const dateStr = new Date(item.addedAt).toLocaleDateString();
             html += `<div class="vocab-item" data-term="${escapeHtml(item.term)}">
-                <div>
-                    <div class="vocab-item-term">${escapeHtml(item.term)}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+                        <div class="vocab-item-term">${escapeHtml(item.term)}</div>
+                        <span class="vocab-cat-badge cat-${cat}">${VOCAB_CAT_LABELS[cat] || cat}</span>
+                    </div>
                     <div class="vocab-item-translation">${escapeHtml(firstTrans)}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:6px;">
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
                     <span class="vocab-item-date">${dateStr}</span>
                     <button class="vocab-item-remove" data-remove="${escapeHtml(item.term)}" title="Remove">✕</button>
                 </div>
@@ -2869,6 +2908,16 @@
         btn.addEventListener('click', () => {
             vocabSort = btn.dataset.sort;
             document.querySelectorAll('.vocab-sort-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderVocabList();
+        });
+    });
+
+    // Category filter handlers
+    document.querySelectorAll('.vocab-cat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            vocabCatFilter = btn.dataset.cat;
+            document.querySelectorAll('.vocab-cat-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             renderVocabList();
         });
