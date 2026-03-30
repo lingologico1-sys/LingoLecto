@@ -352,6 +352,26 @@ app.post('/api/publish', requireAuth, async (req, res) => {
 
         const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+        // Generate unique 6-char alphanumeric token
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 to avoid confusion
+        async function generateToken() {
+            for (let attempt = 0; attempt < 20; attempt++) {
+                let token = '';
+                for (let i = 0; i < 6; i++) token += chars[Math.floor(Math.random() * chars.length)];
+                // Check if token already exists in R2
+                try {
+                    await s3.send(new GetObjectCommand({ Bucket: LECTO_BUCKET, Key: `json/${token}.json` }));
+                    // Object exists, try another token
+                    continue;
+                } catch (e) {
+                    if (e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) return token;
+                    throw e;
+                }
+            }
+            throw new Error('Failed to generate unique token after 20 attempts');
+        }
+        const token = await generateToken();
+
         // 1. Upload audio
         const audioBuf = Buffer.from(audioBase64, 'base64');
         const audioKey = `aud/${slug}.mp3`;
@@ -396,6 +416,7 @@ app.post('/api/publish', requireAuth, async (req, res) => {
         const consolidated = {
             title,
             slug,
+            token,
             source_language: readerData.source_language,
             chunks: readerData.chunks,
             tiptap_html: processedHtml,
@@ -415,7 +436,7 @@ app.post('/api/publish', requireAuth, async (req, res) => {
         const jsonUrl = `${LECTO_DOMAIN}/${jsonKey}`;
         console.log('Published JSON:', jsonUrl);
 
-        res.json({ ok: true, jsonUrl, audioUrl });
+        res.json({ ok: true, jsonUrl, audioUrl, token });
     } catch (err) {
         console.error('Publish error:', err);
         res.status(500).json({ ok: false, error: err.message || 'Publish failed' });
@@ -445,6 +466,7 @@ app.get('/api/lectos', async (req, res) => {
                 items.push({
                     slug,
                     title: data.title || slug,
+                    token: data.token || null,
                     date: obj.LastModified ? obj.LastModified.toISOString() : null,
                     jsonUrl: `${LECTO_DOMAIN}/${obj.Key}`,
                     audioUrl: data.audio_url || null
@@ -460,6 +482,33 @@ app.get('/api/lectos', async (req, res) => {
     } catch (err) {
         console.error('List lectos error:', err);
         res.status(500).json({ ok: false, error: err.message || 'Failed to list lectos' });
+    }
+});
+
+// ── Get a lecto by token ─────────────────────────────────────────────────
+app.get('/api/lecto-by-token/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+        const s3 = makeR2Client();
+        if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
+
+        // Search all lectos for the matching token
+        const listRes = await s3.send(new ListObjectsV2Command({ Bucket: LECTO_BUCKET, Prefix: 'json/' }));
+        for (const obj of (listRes.Contents || [])) {
+            if (!obj.Key.endsWith('.json')) continue;
+            try {
+                const getRes = await s3.send(new GetObjectCommand({ Bucket: LECTO_BUCKET, Key: obj.Key }));
+                const body = await getRes.Body.transformToString();
+                const data = JSON.parse(body);
+                if (data.token && data.token.toUpperCase() === token.toUpperCase()) {
+                    return res.json(data);
+                }
+            } catch (e) { /* skip unreadable files */ }
+        }
+        res.status(404).json({ ok: false, error: 'No lecto found with that code' });
+    } catch (err) {
+        console.error('Token lookup error:', err);
+        res.status(500).json({ ok: false, error: err.message || 'Lookup failed' });
     }
 });
 
