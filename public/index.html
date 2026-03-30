@@ -2821,8 +2821,14 @@
 
     function vocabAdd(data) {
         const list = vocabLoad();
-        const idx = list.findIndex(v => v.term.toLowerCase() === data.term.toLowerCase());
-        const entry = { term: data.term, data, addedAt: Date.now(), category: vocabCategory(data) };
+        const cat = vocabCategory(data);
+        // For verbs, save under the infinitive form if available
+        const infinitive = cat === 'verb' && data.entries && data.entries[0] && data.entries[0].verb_details && data.entries[0].verb_details.infinitive
+            ? data.entries[0].verb_details.infinitive : null;
+        const term = infinitive || data.term;
+        const savedData = infinitive ? { ...data, term } : data;
+        const idx = list.findIndex(v => v.term.toLowerCase() === term.toLowerCase());
+        const entry = { term, data: savedData, addedAt: Date.now(), category: cat };
         if (idx >= 0) list[idx] = entry; else list.push(entry);
         vocabSave(list);
         renderVocabList();
