@@ -199,6 +199,7 @@
         .vocab-cat-badge.cat-verb { background: rgba(74,86,200,0.1); color: #4a56c8; }
         .vocab-cat-badge.cat-noun { background: rgba(45,122,79,0.1); color: var(--success); }
         .vocab-cat-badge.cat-adjective { background: rgba(194,112,62,0.12); color: var(--accent-deep); }
+        .vocab-cat-badge.cat-adverb { background: rgba(0,140,160,0.1); color: #008ca0; }
         .vocab-cat-badge.cat-expression { background: rgba(180,60,180,0.1); color: #a030a0; }
         .vocab-cat-badge.cat-other { background: var(--border-light); color: var(--text-secondary); }
         .vocab-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 14px; }
@@ -355,6 +356,7 @@
                     <button class="vocab-cat-btn" data-cat="verb">Verb</button>
                     <button class="vocab-cat-btn" data-cat="noun">Noun</button>
                     <button class="vocab-cat-btn" data-cat="adjective">Adjective</button>
+                    <button class="vocab-cat-btn" data-cat="adverb">Adverb</button>
                     <button class="vocab-cat-btn" data-cat="expression">Expression</button>
                     <button class="vocab-cat-btn" data-cat="other">Other</button>
                 </div>
@@ -1377,6 +1379,7 @@ function vocabCategory(data) {
     if (/\bverb\b/.test(pos)) return 'verb';
     if (/\bnoun\b/.test(pos)) return 'noun';
     if (/\badj/.test(pos)) return 'adjective';
+    if (/\badv/.test(pos)) return 'adverb';
     if (/idiom|expression|phrase|proverb|collocation/.test(pos)) return 'expression';
     return 'other';
 }
@@ -1401,7 +1404,7 @@ function vocabRemove(term) {
     renderVocabList();
 }
 
-const VOCAB_CAT_LABELS = { verb: 'Verb', noun: 'Noun', adjective: 'Adj.', expression: 'Expr.', other: 'Other' };
+const VOCAB_CAT_LABELS = { verb: 'Verb', noun: 'Noun', adjective: 'Adj.', adverb: 'Adv.', expression: 'Expr.', other: 'Other' };
 
 function renderVocabList() {
     const list = vocabLoad();
