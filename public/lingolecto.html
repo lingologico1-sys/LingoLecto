@@ -476,8 +476,20 @@ async function openLecto() {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || 'Lecto not found. Check your code.');
         }
-        const lecto = await res.json();
-        if (!lecto || !lecto.readerData) throw new Error('Invalid lecto data.');
+        const raw = await res.json();
+        if (!raw || (!raw.chunks && !raw.readerData)) throw new Error('Invalid lecto data.');
+
+        // Normalize flat R2 format → internal shape
+        const lecto = {
+            title: raw.title || '',
+            slug: raw.slug || '',
+            token: raw.token || token,
+            readerData: raw.readerData || { source_language: raw.source_language, chunks: raw.chunks },
+            tiptapData: raw.tiptapData || (raw.tiptap_html ? { html: raw.tiptap_html } : null),
+            alignmentData: raw.alignmentData || raw.alignment || null,
+            audio_url: raw.audio_url || null,
+            questionsData: raw.questionsData || raw.questions || null
+        };
 
         currentLecto = lecto;
         currentToken = token;
