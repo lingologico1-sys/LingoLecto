@@ -204,10 +204,22 @@
         .qr-option.qr-picked .qr-opt-marker { background: var(--accent); color: white; }
         .qr-option.qr-correct .qr-opt-marker { background: var(--success); color: white; }
         .qr-option.qr-wrong .qr-opt-marker { background: var(--error); color: white; }
-        .qr-score-box { margin-top: 12px; }
-        .qr-score-box { margin-top: 14px; padding: 16px; background: var(--success-bg); border: 1px solid rgba(45,122,79,0.3); border-radius: 10px; text-align: center; }
-        .qr-score-pct { font-size: 36px; font-weight: 700; color: var(--success); line-height: 1; }
-        .qr-score-label { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
+        .qr-running-score { font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .qr-running-correct { color: var(--success); }
+        .qr-running-wrong { color: var(--error); }
+        .qr-running-pct { margin-left: auto; font-size: 13px; font-weight: 700; }
+        .qr-final-score { margin-top: 14px; padding: 24px 16px; border-radius: 12px; text-align: center; animation: scoreReveal 0.6s ease-out; }
+        .qr-final-score.score-great { background: linear-gradient(135deg, rgba(45,122,79,0.12), rgba(45,122,79,0.04)); border: 1.5px solid rgba(45,122,79,0.3); }
+        .qr-final-score.score-good { background: linear-gradient(135deg, rgba(194,112,62,0.12), rgba(194,112,62,0.04)); border: 1.5px solid rgba(194,112,62,0.3); }
+        .qr-final-score.score-needs-work { background: linear-gradient(135deg, rgba(200,60,60,0.1), rgba(200,60,60,0.03)); border: 1.5px solid rgba(200,60,60,0.25); }
+        .qr-final-emoji { font-size: 40px; margin-bottom: 8px; }
+        .qr-final-pct { font-size: 42px; font-weight: 800; line-height: 1; }
+        .score-great .qr-final-pct { color: var(--success); }
+        .score-good .qr-final-pct { color: var(--accent); }
+        .score-needs-work .qr-final-pct { color: var(--error); }
+        .qr-final-fraction { font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-top: 6px; }
+        .qr-final-msg { font-size: 13px; color: var(--text-secondary); margin-top: 8px; line-height: 1.5; }
+        @keyframes scoreReveal { from { opacity: 0; transform: scale(0.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         /* Questioner right-panel tabs */
         .qr-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .qr-tab { flex: 1; text-align: center; padding: 9px 0; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; }
@@ -2375,16 +2387,37 @@
 
         const total = qrPrepared.length;
         const answeredCount = qrPrepared.filter(x => x.answered).length;
+        const correct = qrPrepared.filter(x => x.answered && x.options[x.picked] && x.options[x.picked].correct).length;
+        const wrong = answeredCount - correct;
         const allAnswered = answeredCount === total;
         const cur = qrPrepared[qrIdx];
         const isAnswered = cur.answered;
 
-        // Score (only after all answered)
-        let scoreHtml = '';
+        // Running score (shown once at least 1 answered)
+        let runningScoreHtml = '';
+        if (answeredCount > 0) {
+            const pct = Math.round((correct / answeredCount) * 100);
+            runningScoreHtml = `<div class="qr-running-score">
+                <span class="qr-running-correct">✓ ${correct}</span>
+                <span class="qr-running-wrong">✗ ${wrong}</span>
+                <span>${correct}/${answeredCount}</span>
+                <span class="qr-running-pct">${pct}%</span>
+            </div>`;
+        }
+
+        // Final score (after all answered)
+        let finalScoreHtml = '';
         if (allAnswered) {
-            const correct = qrPrepared.filter(x => x.options[x.picked] && x.options[x.picked].correct).length;
             const pct = Math.round((correct / total) * 100);
-            scoreHtml = `<div class="qr-score-box"><div class="qr-score-pct">${pct}%</div><div class="qr-score-label">${correct} / ${total} correct</div></div>`;
+            const tier = pct >= 80 ? 'great' : pct >= 50 ? 'good' : 'needs-work';
+            const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '💪';
+            const msg = pct === 100 ? 'Perfect score!' : pct >= 80 ? 'Excellent work!' : pct >= 50 ? 'Good effort — review the ones you missed.' : 'Keep practicing — you\'ll get there!';
+            finalScoreHtml = `<div class="qr-final-score score-${tier}">
+                <div class="qr-final-emoji">${emoji}</div>
+                <div class="qr-final-pct">${pct}%</div>
+                <div class="qr-final-fraction">${correct} / ${total} correct</div>
+                <div class="qr-final-msg">${msg}</div>
+            </div>`;
         }
 
         // Options HTML
@@ -2409,9 +2442,10 @@
         panel.innerHTML = `
             <div class="qr-counter">Question ${qrIdx + 1} of ${total} &nbsp;·&nbsp; ${answeredCount} answered</div>
             <div class="qr-progress"><div class="qr-progress-fill" style="width:${(answeredCount/total)*100}%"></div></div>
+            ${runningScoreHtml}
             <div class="qr-question-text">${escapeHtml(cur.q.question_text || cur.q.question || cur.q.stem || '')}</div>
             <div class="qr-options" id="qr-options">${optionsHtml}</div>
-            ${scoreHtml}`;
+            ${finalScoreHtml}`;
 
         // Update footer button states
         const btnPrev = $('qr-prev'); if (btnPrev) btnPrev.disabled = false;
