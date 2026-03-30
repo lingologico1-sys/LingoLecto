@@ -521,9 +521,14 @@ function setTokenStatus(msg, type) {
 function initLecto(lecto) {
     if (lectoInitialized) return;
 
-    // Clean up previous state
+    // Clean up previous state — fully stop old audio before replacing
     const prevAudio = $('lectoAudio');
-    if (prevAudio) prevAudio.pause();
+    if (prevAudio) {
+        prevAudio.pause();
+        prevAudio.src = '';
+        prevAudio.load();
+    }
+    $('lecto-audio-container').innerHTML = '';
     if (syncRAF) { cancelAnimationFrame(syncRAF); syncRAF = null; }
     currentAudioChunkId = null;
     navLock = false;
