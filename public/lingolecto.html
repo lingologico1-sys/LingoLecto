@@ -1230,7 +1230,8 @@ function dictLookupWord(word, context) {
     function startPress(e) {
         const chunk = e.target.closest('.chunk');
         const inQrPanel = e.target.closest('#qr-scroll');
-        if (!chunk && !inQrPanel) return;
+        const inDictResults = e.target.closest('.dict-results');
+        if (!chunk && !inQrPanel && !inDictResults) return;
         fired = false;
         const pt = e.touches ? e.touches[0] : e;
         pressX = pt.clientX; pressY = pt.clientY;
