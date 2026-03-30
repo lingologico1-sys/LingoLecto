@@ -68,9 +68,16 @@
         .status-msg.error { color: var(--error); background: var(--error-bg); }
         .status-msg.loading { color: var(--accent); background: var(--accent-glow); }
 
-        /* DASHBOARD VOCAB */
+        /* DASHBOARD PANELS */
         .vocab-dash-btn { width: 100%; max-width: 420px; margin-top: 12px; }
         .vocab-dash-panel { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border-light); border-radius: 12px; overflow: hidden; margin-top: 0; }
+        .recent-lectos-panel { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border-light); border-radius: 12px; overflow: hidden; margin-top: 0; }
+        .recent-lecto-item { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid var(--border-light); cursor: pointer; transition: background 0.12s; gap: 10px; }
+        .recent-lecto-item:last-child { border-bottom: none; }
+        .recent-lecto-item:hover { background: var(--accent-glow); }
+        .recent-lecto-token { font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; color: var(--accent); background: rgba(194,112,62,0.1); padding: 2px 7px; border-radius: 4px; flex-shrink: 0; }
+        .recent-lecto-title { font-size: 13px; font-weight: 500; color: var(--ink); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .recent-lecto-date { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
 
         /* QUESTIONER LAYOUT */
         .questioner-wrap { display: grid; grid-template-columns: 1fr 360px; flex: 1; overflow: hidden; min-height: 0; }
@@ -278,6 +285,10 @@
             </div>
             <button class="btn btn-primary" id="btn-open-lecto">Open Lecto</button>
             <div id="token-status" class="status-msg" style="display:none;"></div>
+        </div>
+        <button class="btn btn-secondary vocab-dash-btn" id="btn-recent-lectos" style="display:none;">Recent Lectos ▾</button>
+        <div id="recent-lectos-panel" class="recent-lectos-panel" style="display:none;">
+            <div id="recent-lectos-list"></div>
         </div>
         <button class="btn btn-secondary vocab-dash-btn" id="btn-dash-vocab">My Vocab ▾</button>
         <div id="dash-vocab-panel" class="vocab-dash-panel" style="display:none;">
@@ -515,6 +526,7 @@ async function openLecto() {
         currentLecto = lecto;
         currentToken = token;
         lectoInitialized = false;
+        recentLectosAdd(token, lecto.title || (lecto.questionsData && lecto.questionsData.exam_title) || token);
         setTokenStatus('', '');
         showView('view-lecto');
         initLecto(lecto);
@@ -531,6 +543,60 @@ function setTokenStatus(msg, type) {
     el.className = 'status-msg' + (type ? ' ' + type : '');
     el.style.display = msg ? 'block' : 'none';
 }
+
+// ================================================================
+// RECENT LECTOS
+// ================================================================
+const RECENT_KEY = 'lingolecto_recent';
+const RECENT_MAX = 8;
+
+function recentLectosLoad() { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } }
+function recentLectosSave(list) { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); }
+
+function recentLectosAdd(token, title) {
+    let list = recentLectosLoad();
+    list = list.filter(r => r.token !== token); // remove duplicate
+    list.unshift({ token, title, visitedAt: Date.now() });
+    if (list.length > RECENT_MAX) list = list.slice(0, RECENT_MAX);
+    recentLectosSave(list);
+    renderRecentLectos();
+}
+
+function renderRecentLectos() {
+    const list = recentLectosLoad();
+    const btn = $('btn-recent-lectos');
+    const panel = $('recent-lectos-panel');
+    if (!list.length) { btn.style.display = 'none'; panel.style.display = 'none'; return; }
+    btn.style.display = '';
+    const container = $('recent-lectos-list');
+    container.innerHTML = list.map(r => {
+        const date = new Date(r.visitedAt).toLocaleDateString();
+        return `<div class="recent-lecto-item" data-token="${escapeHtml(r.token)}">
+            <span class="recent-lecto-token">${escapeHtml(r.token)}</span>
+            <span class="recent-lecto-title">${escapeHtml(r.title || r.token)}</span>
+            <span class="recent-lecto-date">${date}</span>
+        </div>`;
+    }).join('');
+    container.querySelectorAll('.recent-lecto-item').forEach(el => {
+        el.addEventListener('click', () => {
+            tokenInput.value = el.dataset.token;
+            recentLectosOpen = false;
+            panel.style.display = 'none';
+            btn.textContent = 'Recent Lectos ▾';
+            openLecto();
+        });
+    });
+}
+
+let recentLectosOpen = false;
+$('btn-recent-lectos').addEventListener('click', () => {
+    recentLectosOpen = !recentLectosOpen;
+    $('recent-lectos-panel').style.display = recentLectosOpen ? 'block' : 'none';
+    $('btn-recent-lectos').textContent = recentLectosOpen ? 'Recent Lectos ▴' : 'Recent Lectos ▾';
+});
+
+// Init on dashboard show
+renderRecentLectos();
 
 // ================================================================
 // LECTO INITIALIZATION
