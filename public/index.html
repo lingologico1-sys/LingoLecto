@@ -241,6 +241,26 @@
         .dict-conj-grid .conj-pronoun { color: var(--text-secondary); min-width: 28px; font-size: 12px; }
         .dict-conj-grid .conj-form { color: var(--ink); font-weight: 600; }
         .dict-error { color: var(--error); font-size: 13px; text-align: center; padding: 24px 16px; }
+        .dict-save { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; background: rgba(194,112,62,0.06); border-radius: 6px; cursor: pointer; user-select: none; font-size: 12px; color: var(--text-secondary); transition: background 0.15s; }
+        .dict-save:hover { background: rgba(194,112,62,0.12); }
+        .dict-save input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+        .dict-save.saved { color: var(--accent); font-weight: 600; }
+
+        /* My Vocab */
+        .vocab-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .vocab-sort { display: flex; gap: 4px; }
+        .vocab-sort-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+        .vocab-sort-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+        .vocab-count { font-size: 12px; color: var(--text-secondary); }
+        .vocab-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 14px; }
+        .vocab-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; }
+        .vocab-item:hover { border-color: var(--accent); background: var(--accent-glow); }
+        .vocab-item-term { font-size: 14px; font-weight: 600; color: var(--ink); }
+        .vocab-item-translation { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .vocab-item-date { font-size: 11px; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
+        .vocab-item-remove { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; opacity: 0; transition: opacity 0.15s, color 0.15s; }
+        .vocab-item:hover .vocab-item-remove { opacity: 1; }
+        .vocab-item-remove:hover { color: var(--error); }
 
         @media (max-width: 800px) { .questioner-wrap { grid-template-columns: 1fr; height: auto; overflow: visible; } .questioner-right { height: 60vh; } }
 
@@ -406,6 +426,7 @@
                     <div class="qr-tabs">
                         <div class="qr-tab active" data-qrtab="questions">Questions</div>
                         <div class="qr-tab" data-qrtab="dictionary">Dictionary</div>
+                        <div class="qr-tab" data-qrtab="vocab">My Vocab</div>
                     </div>
                     <div class="qr-tab-panel active" id="qr-tab-questions">
                         <div class="qr-scroll" id="qr-scroll">
@@ -424,6 +445,18 @@
                         </div>
                         <div class="dict-results" id="dict-results">
                             <div class="dict-empty">Type a French word above and press Enter or click Look up.</div>
+                        </div>
+                    </div>
+                    <div class="qr-tab-panel" id="qr-tab-vocab">
+                        <div class="vocab-header">
+                            <div class="vocab-sort">
+                                <button class="vocab-sort-btn active" data-sort="alpha">A–Z</button>
+                                <button class="vocab-sort-btn" data-sort="recent">Recent</button>
+                            </div>
+                            <span class="vocab-count" id="vocab-count">0 words</span>
+                        </div>
+                        <div class="vocab-list" id="vocab-list">
+                            <div class="dict-empty">No vocabulary saved yet. Look up a word in the Dictionary and check "Save to My Vocab".</div>
                         </div>
                     </div>
                 </div>
@@ -2459,14 +2492,23 @@
         return html;
     }
 
+    let _lastDictData = null;
+
     function renderDictResult(data) {
         const res = $('dict-results');
         if (!data || !data.entries || !data.entries.length) {
             res.innerHTML = '<div class="dict-empty">No results found.</div>';
+            _lastDictData = null;
             return;
         }
+        _lastDictData = data;
         const term = data.term || '';
+        const isSaved = vocabHas(term);
         let html = `<div class="dict-term">${escapeHtml(term)}</div>`;
+        // Save to vocab checkbox
+        html += `<label class="dict-save${isSaved ? ' saved' : ''}" id="dict-save-label">
+            <input type="checkbox" id="dict-save-cb" ${isSaved ? 'checked' : ''}> ${isSaved ? 'Saved to My Vocab' : 'Save to My Vocab'}
+        </label>`;
         for (const entry of data.entries) {
             html += `<div class="dict-entry"><div class="dict-pos">${escapeHtml(entry.part_of_speech)}</div>`;
             for (const def of (entry.definitions || [])) {
@@ -2492,6 +2534,22 @@
             html += `</div>`;
         }
         res.innerHTML = html;
+
+        // Wire up save checkbox
+        const cb = $('dict-save-cb');
+        if (cb) {
+            cb.addEventListener('change', () => {
+                if (cb.checked) {
+                    vocabAdd(data);
+                    $('dict-save-label').classList.add('saved');
+                    $('dict-save-label').querySelector('input').nextSibling.textContent = ' Saved to My Vocab';
+                } else {
+                    vocabRemove(term);
+                    $('dict-save-label').classList.remove('saved');
+                    $('dict-save-label').querySelector('input').nextSibling.textContent = ' Save to My Vocab';
+                }
+            });
+        }
     }
 
     async function dictLookup() {
@@ -2633,6 +2691,103 @@
             el.addEventListener('touchcancel', cancelPress);
         });
     })();
+
+    // ================================================================
+    // MY VOCAB (localStorage)
+    // ================================================================
+    const VOCAB_KEY = 'lingoreader_vocab';
+    let vocabSort = 'alpha'; // 'alpha' or 'recent'
+
+    function vocabLoad() {
+        try { return JSON.parse(localStorage.getItem(VOCAB_KEY)) || []; } catch { return []; }
+    }
+    function vocabSave(list) { localStorage.setItem(VOCAB_KEY, JSON.stringify(list)); }
+    function vocabHas(term) { return vocabLoad().some(v => v.term.toLowerCase() === term.toLowerCase()); }
+
+    function vocabAdd(data) {
+        const list = vocabLoad();
+        const idx = list.findIndex(v => v.term.toLowerCase() === data.term.toLowerCase());
+        const entry = { term: data.term, data, addedAt: Date.now() };
+        if (idx >= 0) list[idx] = entry; else list.push(entry);
+        vocabSave(list);
+        renderVocabList();
+    }
+
+    function vocabRemove(term) {
+        const list = vocabLoad().filter(v => v.term.toLowerCase() !== term.toLowerCase());
+        vocabSave(list);
+        renderVocabList();
+    }
+
+    function renderVocabList() {
+        const list = vocabLoad();
+        const container = $('vocab-list');
+        $('vocab-count').textContent = list.length + (list.length === 1 ? ' word' : ' words');
+        if (!list.length) {
+            container.innerHTML = '<div class="dict-empty">No vocabulary saved yet. Look up a word in the Dictionary and check "Save to My Vocab".</div>';
+            return;
+        }
+        const sorted = [...list];
+        if (vocabSort === 'alpha') sorted.sort((a, b) => a.term.localeCompare(b.term, 'fr'));
+        else sorted.sort((a, b) => b.addedAt - a.addedAt);
+
+        let html = '';
+        for (const item of sorted) {
+            const firstTrans = (item.data.entries && item.data.entries[0] && item.data.entries[0].definitions && item.data.entries[0].definitions[0])
+                ? item.data.entries[0].definitions[0].translation : '';
+            const dateStr = new Date(item.addedAt).toLocaleDateString();
+            html += `<div class="vocab-item" data-term="${escapeHtml(item.term)}">
+                <div>
+                    <div class="vocab-item-term">${escapeHtml(item.term)}</div>
+                    <div class="vocab-item-translation">${escapeHtml(firstTrans)}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span class="vocab-item-date">${dateStr}</span>
+                    <button class="vocab-item-remove" data-remove="${escapeHtml(item.term)}" title="Remove">✕</button>
+                </div>
+            </div>`;
+        }
+        container.innerHTML = html;
+
+        // Click to show definition
+        container.querySelectorAll('.vocab-item').forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.vocab-item-remove')) return;
+                const term = el.dataset.term;
+                const item = vocabLoad().find(v => v.term === term);
+                if (item && item.data) {
+                    // Switch to dictionary tab and show the saved result
+                    document.querySelectorAll('.qr-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelector('.qr-tab[data-qrtab="dictionary"]').classList.add('active');
+                    document.querySelectorAll('.qr-tab-panel').forEach(p => p.classList.remove('active'));
+                    document.getElementById('qr-tab-dictionary').classList.add('active');
+                    $('dict-input').value = term;
+                    renderDictResult(item.data);
+                }
+            });
+        });
+
+        // Remove buttons
+        container.querySelectorAll('.vocab-item-remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                vocabRemove(btn.dataset.remove);
+            });
+        });
+    }
+
+    // Sort button handlers
+    document.querySelectorAll('.vocab-sort-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            vocabSort = btn.dataset.sort;
+            document.querySelectorAll('.vocab-sort-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderVocabList();
+        });
+    });
+
+    // Initial render
+    renderVocabList();
 
     // ================================================================
     // CHUNK HOVER (auto-dismiss after 2s)
