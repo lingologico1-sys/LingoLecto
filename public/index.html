@@ -2481,11 +2481,23 @@
             return `<div class="${cls}" data-opt="${i}"><span class="qr-opt-marker">${marker}</span><span>${escapeHtml(opt.text)}</span></div>`;
         }).join('');
 
+        let sourceSentenceHtml = '';
+        if (cur.q.source_sentence) {
+            let ss = escapeHtml(cur.q.source_sentence);
+            if (cur.q.target) {
+                const safe = escapeHtml(cur.q.target).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                let rx; try { rx = new RegExp('(?<![\\p{L}\\p{N}])(' + safe + ')(?![\\p{L}\\p{N}])', 'giu'); } catch(e) { rx = new RegExp('(' + safe + ')', 'gi'); }
+                ss = ss.replace(rx, m => '<strong style="color:var(--accent-deep);">' + m + '</strong>');
+            }
+            sourceSentenceHtml = `<div style="font-size:13px;font-style:italic;color:var(--ink);background:var(--paper);border-left:3px solid var(--accent);padding:8px 12px;border-radius:5px;margin-bottom:12px;line-height:1.5;">« ${ss} »</div>`;
+        }
+
         panel.innerHTML = `
             <div class="qr-counter">Question ${qrIdx + 1} of ${total} &nbsp;·&nbsp; ${answeredCount} answered</div>
             <div class="qr-progress"><div class="qr-progress-fill" style="width:${(answeredCount/total)*100}%"></div></div>
             ${runningScoreHtml}
             <div class="qr-question-text">${escapeHtml(cur.q.question_text || cur.q.question || cur.q.stem || '')}</div>
+            ${sourceSentenceHtml}
             <div class="qr-options" id="qr-options">${optionsHtml}</div>
             ${finalScoreHtml}`;
 
