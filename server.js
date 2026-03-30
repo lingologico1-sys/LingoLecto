@@ -767,6 +767,52 @@ IMPORTANT: If context is provided, check whether the word is part of an idiomati
     }
 });
 
+// ── Save student results (no auth) ───────────────────────────────────────
+app.post('/api/results', async (req, res) => {
+    try {
+        const s3 = makeR2Client();
+        if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
+        const body = req.body;
+        if (!body || !body.token) return res.status(400).json({ ok: false, error: 'Missing token' });
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        const key = `results/${body.token}_${ts}.json`;
+        const data = { ...body, savedAt: new Date().toISOString() };
+        await s3.send(new PutObjectCommand({
+            Bucket: LECTO_BUCKET,
+            Key: key,
+            Body: JSON.stringify(data),
+            ContentType: 'application/json'
+        }));
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('Save results error:', err);
+        res.status(500).json({ ok: false, error: err.message || 'Failed to save results' });
+    }
+});
+
+// ── List all student results (auth required) ──────────────────────────────
+app.get('/api/results', requireAuth, async (_req, res) => {
+    try {
+        const s3 = makeR2Client();
+        if (!s3) return res.status(500).json({ ok: false, error: 'R2 credentials not configured' });
+        const listRes = await s3.send(new ListObjectsV2Command({ Bucket: LECTO_BUCKET, Prefix: 'results/' }));
+        const items = [];
+        for (const obj of (listRes.Contents || [])) {
+            if (!obj.Key.endsWith('.json')) continue;
+            try {
+                const getRes = await s3.send(new GetObjectCommand({ Bucket: LECTO_BUCKET, Key: obj.Key }));
+                const text = await getRes.Body.transformToString();
+                items.push(JSON.parse(text));
+            } catch (e) { /* skip unreadable */ }
+        }
+        items.sort((a, b) => (b.savedAt || b.submittedAt || '').localeCompare(a.savedAt || a.submittedAt || ''));
+        res.json({ ok: true, results: items });
+    } catch (err) {
+        console.error('List results error:', err);
+        res.status(500).json({ ok: false, error: err.message || 'Failed to list results' });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

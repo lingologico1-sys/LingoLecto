@@ -307,6 +307,18 @@
             .form-card { padding: 20px; }
             .tiptap-editor-frame { height: 400px; }
         }
+
+        /* Results table */
+        .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .results-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); border-bottom: 2px solid var(--border); padding: 8px 10px; text-align: left; cursor: pointer; user-select: none; white-space: nowrap; }
+        .results-table th:hover { color: var(--ink); }
+        .results-table th.sorted-asc::after { content: ' ↑'; }
+        .results-table th.sorted-desc::after { content: ' ↓'; }
+        .results-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+        .results-table tr:hover td { background: var(--surface); }
+        .results-score.great { color: var(--success); font-weight: 700; }
+        .results-score.good { color: var(--accent); font-weight: 700; }
+        .results-score.needs-work { color: var(--error); font-weight: 700; }
     </style>
 </head>
 <body>
@@ -418,6 +430,7 @@
             <div class="reader-tab" data-rtab="editor">Editor</div>
             <div class="reader-tab" data-rtab="questions">Questions</div>
             <div class="reader-tab" data-rtab="data">Data</div>
+            <div class="reader-tab" data-rtab="results">Results</div>
         </div>
 
         <!-- Reader Panel -->
@@ -671,6 +684,22 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="reader-panel" id="rpanel-results">
+            <div class="data-container">
+                <div class="data-section">
+                    <div class="data-section-header">
+                        <div class="data-section-title">Student Results</div>
+                        <div class="data-section-actions">
+                            <button class="btn-sm primary" id="btn-load-results">↻ Refresh</button>
+                        </div>
+                    </div>
+                    <div id="results-status" style="font-size:13px; color:var(--text-secondary); margin:8px 0;"></div>
+                    <div id="results-table-wrap" style="overflow-x:auto;"></div>
+                </div>
             </div>
         </div>
 
@@ -1248,6 +1277,7 @@
             if (tab.dataset.rtab === 'editor') initReaderEditor();
             if (tab.dataset.rtab === 'questions') initQuestionsPanel();
             if (tab.dataset.rtab === 'questioner') initQuestioner();
+            if (tab.dataset.rtab === 'results') loadResults();
         });
     });
 
@@ -3205,6 +3235,83 @@ document.getElementById('editor').addEventListener('scroll',function(){if(rsWrap
 <\/script>
 </body></html>`;
     }
+
+    // ================================================================
+    // RESULTS TAB
+    // ================================================================
+    let allResults = [];
+    let resultsSortKey = 'submittedAt';
+    let resultsSortDir = -1; // -1 = desc, 1 = asc
+
+    async function loadResults() {
+        $('results-status').textContent = 'Loading…';
+        $('results-table-wrap').innerHTML = '';
+        try {
+            const res = await authedFetch('/api/results');
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Failed to load');
+            allResults = data.results || [];
+            $('results-status').textContent = allResults.length + ' result' + (allResults.length !== 1 ? 's' : '');
+            renderResultsTable();
+        } catch (err) {
+            $('results-status').textContent = 'Error: ' + err.message;
+        }
+    }
+
+    function renderResultsTable() {
+        if (!allResults.length) {
+            $('results-table-wrap').innerHTML = '<div style="font-size:13px;color:var(--text-secondary);padding:16px 0;">No results yet.</div>';
+            return;
+        }
+        const sorted = [...allResults].sort((a, b) => {
+            let va = a[resultsSortKey] || '', vb = b[resultsSortKey] || '';
+            if (resultsSortKey === '_pct') {
+                va = a.total > 0 ? a.score / a.total : 0;
+                vb = b.total > 0 ? b.score / b.total : 0;
+            }
+            if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * resultsSortDir;
+            return String(va).localeCompare(String(vb)) * resultsSortDir;
+        });
+        const cols = [
+            { key: 'submittedAt', label: 'Date' },
+            { key: 'token', label: 'Token' },
+            { key: 'lectoTitle', label: 'Lecto' },
+            { key: 'studentName', label: 'Student' },
+            { key: 'className', label: 'Class' },
+            { key: '_pct', label: 'Score' },
+        ];
+        let html = '<table class="results-table"><thead><tr>';
+        for (const col of cols) {
+            const sc = resultsSortKey === col.key ? (resultsSortDir === 1 ? ' sorted-asc' : ' sorted-desc') : '';
+            html += `<th class="${sc}" data-key="${col.key}">${col.label}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+        for (const r of sorted) {
+            const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+            const tier = pct >= 80 ? 'great' : pct >= 50 ? 'good' : 'needs-work';
+            const date = r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() + ' ' + new Date(r.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            html += `<tr>
+                <td style="white-space:nowrap;font-size:12px;">${escapeHtml(date)}</td>
+                <td><span class="lecto-token">${escapeHtml(r.token || '')}</span></td>
+                <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.lectoTitle || '')}</td>
+                <td>${escapeHtml(r.studentName || '')}</td>
+                <td>${escapeHtml(r.className || '')}</td>
+                <td><span class="results-score ${tier}">${r.score}/${r.total} (${pct}%)</span></td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        $('results-table-wrap').innerHTML = html;
+        $('results-table-wrap').querySelectorAll('th[data-key]').forEach(th => {
+            th.addEventListener('click', () => {
+                const key = th.dataset.key;
+                if (resultsSortKey === key) resultsSortDir *= -1;
+                else { resultsSortKey = key; resultsSortDir = 1; }
+                renderResultsTable();
+            });
+        });
+    }
+
+    $('btn-load-results').addEventListener('click', loadResults);
 
     // ================================================================
     // INIT
