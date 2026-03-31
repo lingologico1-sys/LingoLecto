@@ -1319,7 +1319,13 @@ function dictLookupWord(word, context) {
         });
         const span = document.createElement('span');
         span.className = 'dict-word-highlight';
-        try { wordRange.surroundContents(span); } catch (e) { return; }
+        try {
+            wordRange.surroundContents(span);
+        } catch(e) {
+            // Range crosses element boundaries — extract and rewrap
+            span.appendChild(wordRange.extractContents());
+            wordRange.insertNode(span);
+        }
         setTimeout(() => {
             if (span.parentNode) {
                 const p = span.parentNode;

@@ -2744,7 +2744,13 @@
             });
             const span = document.createElement('span');
             span.className = 'dict-word-highlight';
-            wordRange.surroundContents(span);
+            try {
+                wordRange.surroundContents(span);
+            } catch(e) {
+                // Range crosses element boundaries — extract and rewrap
+                span.appendChild(wordRange.extractContents());
+                wordRange.insertNode(span);
+            }
             // Auto-remove after animation completes
             setTimeout(() => {
                 if (span.parentNode) {
