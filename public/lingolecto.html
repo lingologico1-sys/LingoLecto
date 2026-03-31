@@ -1349,7 +1349,8 @@ function dictLookupWord(word, context) {
             if (!result) return;
             highlightWord(result.range);
             const contextEl = chunk || e.target.closest('.qr-option, .qr-question-text') || e.target;
-            dictLookupWord(result.word, (contextEl.textContent || '').trim());
+            // Delay lookup so the flash animation is visible before tab switch / content replace
+            setTimeout(() => dictLookupWord(result.word, (contextEl.textContent || '').trim()), 400);
         }, DELAY);
     }
 

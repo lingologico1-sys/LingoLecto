@@ -2777,7 +2777,8 @@
                 // Gather surrounding sentence as context for idiom detection
                 const contextEl = chunk || e.target.closest('.qr-option, .qr-question-text') || e.target;
                 const contextText = (contextEl.textContent || '').trim();
-                dictLookupWord(result.word, contextText);
+                // Delay lookup so the flash animation is visible before tab switch / content replace
+                setTimeout(() => dictLookupWord(result.word, contextText), 400);
             }, DELAY);
         }
 
