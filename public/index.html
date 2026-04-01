@@ -2417,8 +2417,9 @@
                 const c = chunkMap.get(t.getAttribute('data-id'));
                 if (c) { activeAudioId = 'questionerAudio'; showTooltip(t, c); }
             });
+            const scrollEl = $('questioner-left');
+            scrollEl.addEventListener('scroll', _scheduleHideTooltipOnScroll, { passive: true });
             if (audioSrc && state.alignmentData) {
-                const scrollEl = $('questioner-left');
                 setupAudioSync('questionerAudio', 'questioner-text', scrollEl, 'rpanel-questioner');
             }
             qrInitialized = true;
@@ -3052,9 +3053,17 @@
         tooltipEl.style.top = `${top}px`; tooltipEl.style.left = `${left}px`;
         if (!state.tappedIds.has(chunk.id)) { state.tapCount++; state.tappedIds.add(chunk.id); $('tapCount').textContent = state.tapCount; $('uniqueCount').textContent = state.tappedIds.size; saveState(); }
     }
-    function hideTooltip() { tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } tapResumeTime = null; }
+    let _tooltipScrollTimer = null;
+    function hideTooltip() {
+        if (_tooltipScrollTimer) { clearTimeout(_tooltipScrollTimer); _tooltipScrollTimer = null; }
+        tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } tapResumeTime = null;
+    }
+    function _scheduleHideTooltipOnScroll() {
+        if (_tooltipScrollTimer || !tooltipEl.classList.contains('visible')) return;
+        _tooltipScrollTimer = setTimeout(() => { _tooltipScrollTimer = null; hideTooltip(); }, 2000);
+    }
     document.addEventListener('click', (e) => { if (tooltipEl.classList.contains('visible') && !e.target.closest('.chunk') && !e.target.closest('.tooltip')) hideTooltip(); });
-    window.addEventListener('scroll', hideTooltip, { passive: true });
+    window.addEventListener('scroll', _scheduleHideTooltipOnScroll, { passive: true });
     window.addEventListener('resize', hideTooltip, { passive: true });
 
     // ================================================================
