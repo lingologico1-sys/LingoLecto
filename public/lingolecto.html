@@ -98,9 +98,9 @@
         .audio-bar-btns { display: flex; gap: 6px; flex-shrink: 0; }
         .audio-bar-btns button { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--paper); color: var(--ink); cursor: pointer; transition: background 0.15s; font-family: 'DM Sans', sans-serif; }
         .audio-bar-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
-        .audio-bar-hints { display: flex; align-items: center; gap: 10px; flex-shrink: 0; border-left: 1px solid var(--border); padding-left: 16px; }
-        .audio-hint { display: inline-flex; align-items: center; gap: 3px; }
-        .audio-hint kbd { display: inline-block; padding: 1px 6px; font-size: 11px; font-family: inherit; line-height: 1.6; background: transparent; border: 1px solid var(--border); border-radius: 3px; box-shadow: 0 1px 0 var(--border); color: var(--text-secondary); }
+        .audio-bar-hints { display: flex; align-items: center; gap: 14px; flex-shrink: 0; border-left: 1px solid var(--border); padding-left: 16px; }
+        .audio-hint { display: inline-flex; align-items: center; gap: 5px; }
+        .audio-hint kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; font-size: 13px; font-family: inherit; background: var(--surface); border: 1px solid var(--border); border-bottom: 3px solid var(--border); border-radius: 5px; color: var(--ink); font-weight: 600; line-height: 1; }
         .audio-hint-label { font-size: 10px; color: var(--text-secondary); letter-spacing: 0.03em; }
         @media (max-width: 800px) { .audio-bar-hints { display: none; } }
         .reader-text { font-family: 'Lora', Georgia, serif; font-size: 20px; line-height: 1.85; color: var(--ink); letter-spacing: 0.01em; }
@@ -411,7 +411,6 @@
         <button id="audio-bar-sentence" title="Back to sentence start">↩</button>
     </div>
     <div class="audio-bar-hints">
-        <span class="audio-hint"><kbd>←</kbd><kbd>→</kbd></span>
         <span class="audio-hint"><kbd>↑</kbd><span class="audio-hint-label">trad.</span></span>
         <span class="audio-hint"><kbd>↓</kbd><span class="audio-hint-label">▶⏸</span></span>
     </div>
