@@ -120,6 +120,7 @@
         /* Pinned audio bar */
         .audio-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 900; display: none; align-items: center; gap: 12px; padding: 10px 20px; background: var(--card); border-top: 1px solid var(--border); box-shadow: 0 -2px 12px rgba(0,0,0,0.12); }
         .audio-bar.visible { display: flex; }
+        .audio-bar.narrow-right { right: 360px; }
         .audio-bar-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; color: var(--accent); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
         .audio-bar-btn:hover { background: var(--accent); color: #fff; }
         .audio-bar-progress { flex: 1; height: 6px; background: var(--border); border-radius: 3px; cursor: pointer; position: relative; overflow: hidden; }
@@ -1323,7 +1324,7 @@
             if (tab.dataset.rtab === 'questioner') initQuestioner();
             // Show audio bar for panels with audio, hide for others
             if (tab.dataset.rtab === 'reader') { const a = document.getElementById('readerAudio'); showAudioBar(a ? 'readerAudio' : null); }
-            else if (tab.dataset.rtab === 'questioner') { const a = document.getElementById('questionerAudio'); showAudioBar(a ? 'questionerAudio' : null); }
+            else if (tab.dataset.rtab === 'questioner') { const a = document.getElementById('questionerAudio'); showAudioBar(a ? 'questionerAudio' : null, true); }
             else { showAudioBar(null); }
             if (tab.dataset.rtab === 'results') loadResults();
         });
@@ -2403,7 +2404,7 @@
             ac.innerHTML = audioSrc
                 ? `<audio id="questionerAudio" preload="auto" src="${audioSrc}"></audio>`
                 : '';
-            showAudioBar(audioSrc ? 'questionerAudio' : null);
+            showAudioBar(audioSrc ? 'questionerAudio' : null, true);
             const qt = $('questioner-text');
             const useTiptap = state.tiptapData && state.tiptapData.html;
             if (useTiptap) { qt.innerHTML = buildTiptapWithChunks(); qt.className = 'reader-text tiptap-rich'; }
@@ -3416,10 +3417,11 @@ document.getElementById('editor').addEventListener('scroll',function(){if(rsWrap
     // ================================================================
     let audioBarAudioId = null;
     let audioBarRAF = null;
-    function showAudioBar(audioId) {
+    function showAudioBar(audioId, narrowRight = false) {
         const bar = $('audio-bar');
-        if (!audioId) { bar.classList.remove('visible'); audioBarAudioId = null; return; }
+        if (!audioId) { bar.classList.remove('visible', 'narrow-right'); audioBarAudioId = null; return; }
         audioBarAudioId = audioId;
+        bar.classList.toggle('narrow-right', narrowRight);
         bar.classList.add('visible');
         // Wait for the audio element to be in DOM
         setTimeout(() => {
