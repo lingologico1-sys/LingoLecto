@@ -109,14 +109,25 @@
         .json-viewer-apply { margin-top: 8px; font-size: 12px; padding: 6px 14px; }
 
         /* READER */
-        .reader-container { max-width: 680px; margin: 0 auto; padding: 40px 32px 100px; animation: fadeUp 0.4s ease-out; }
+        .reader-container { max-width: 680px; margin: 0 auto; padding: 40px 32px 80px; animation: fadeUp 0.4s ease-out; }
         .audio-container { margin-bottom: 32px; }
-        .audio-container audio { width: 100%; height: 44px; border-radius: 8px; outline: none; }
+        .audio-container audio { display: none; }
         .audio-btns { display: flex; gap: 8px; margin-top: 8px; }
         .audio-btns button { flex: 1; padding: 6px 0; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--ink); cursor: pointer; transition: background 0.15s; }
         .audio-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
         .kbd-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
         .kbd-legend kbd { display: inline-block; padding: 1px 5px; font-size: 11px; font-family: inherit; background: var(--card); border: 1px solid var(--border); border-radius: 3px; box-shadow: 0 1px 0 var(--border); }
+        /* Pinned audio bar */
+        .audio-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 900; display: none; align-items: center; gap: 12px; padding: 10px 20px; background: var(--card); border-top: 1px solid var(--border); box-shadow: 0 -2px 12px rgba(0,0,0,0.12); }
+        .audio-bar.visible { display: flex; }
+        .audio-bar-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; color: var(--accent); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
+        .audio-bar-btn:hover { background: var(--accent); color: #fff; }
+        .audio-bar-progress { flex: 1; height: 6px; background: var(--border); border-radius: 3px; cursor: pointer; position: relative; overflow: hidden; }
+        .audio-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.1s linear; }
+        .audio-bar-time { font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; white-space: nowrap; flex-shrink: 0; }
+        .audio-bar-btns { display: flex; gap: 6px; flex-shrink: 0; }
+        .audio-bar-btns button { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--card); color: var(--ink); cursor: pointer; transition: background 0.15s; }
+        .audio-bar-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
         .reader-text { font-family: 'Lora', Georgia, serif; font-size: 20px; line-height: 1.85; color: var(--ink); letter-spacing: 0.01em; }
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
@@ -1261,7 +1272,8 @@
         if (existingAudio) { existingAudio.pause(); existingAudio.removeAttribute('src'); existingAudio.load(); }
         if (syncRAF) { cancelAnimationFrame(syncRAF); syncRAF = null; }
         const audioSrc = state.audioUrl || (state.audioBase64 ? 'data:audio/mpeg;base64,' + state.audioBase64 : null);
-        ac.innerHTML = audioSrc ? `<audio id="readerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="btn-rewind" title="Rewind to start">⏮ Rewind</button><button id="btn-sentence" title="Back to sentence start">↩ Sentence start</button></div><div class="kbd-legend"><span><kbd>Space</kbd> / <kbd>↓</kbd> Play/Pause</span><span><kbd>←</kbd> Prev Chunk</span><span><kbd>→</kbd> Next Chunk</span><span><kbd>↑</kbd> Show Translation</span></div><details id="diag-panel" style="margin-top:12px;font-size:12px;"><summary style="cursor:pointer;color:#888;user-select:none;">Diagnostics</summary><pre id="diag-content" style="max-height:200px;overflow:auto;background:#f5f5f5;padding:8px;border-radius:4px;font-size:11px;white-space:pre-wrap;margin:6px 0;"></pre><button id="diag-copy" style="font-size:11px;padding:2px 10px;cursor:pointer;">Copy to clipboard</button><button id="diag-clear" style="font-size:11px;padding:2px 10px;cursor:pointer;margin-left:4px;">Clear</button></details>` : '';
+        ac.innerHTML = audioSrc ? `<audio id="readerAudio" preload="auto" src="${audioSrc}"></audio><details id="diag-panel" style="margin-top:12px;font-size:12px;"><summary style="cursor:pointer;color:#888;user-select:none;">Diagnostics</summary><pre id="diag-content" style="max-height:200px;overflow:auto;background:#f5f5f5;padding:8px;border-radius:4px;font-size:11px;white-space:pre-wrap;margin:6px 0;"></pre><button id="diag-copy" style="font-size:11px;padding:2px 10px;cursor:pointer;">Copy to clipboard</button><button id="diag-clear" style="font-size:11px;padding:2px 10px;cursor:pointer;margin-left:4px;">Clear</button></details>` : '';
+        showAudioBar(audioSrc ? 'readerAudio' : null);
 
         const rt = $('reader-text');
         const useTiptap = state.tiptapData && state.tiptapData.html;
@@ -1296,6 +1308,10 @@
             if (tab.dataset.rtab === 'editor') initReaderEditor();
             if (tab.dataset.rtab === 'questions') initQuestionsPanel();
             if (tab.dataset.rtab === 'questioner') initQuestioner();
+            // Show audio bar for panels with audio, hide for others
+            if (tab.dataset.rtab === 'reader') { const a = document.getElementById('readerAudio'); showAudioBar(a ? 'readerAudio' : null); }
+            else if (tab.dataset.rtab === 'questioner') { const a = document.getElementById('questionerAudio'); showAudioBar(a ? 'questionerAudio' : null); }
+            else { showAudioBar(null); }
             if (tab.dataset.rtab === 'results') loadResults();
         });
     });
@@ -2332,34 +2348,28 @@
         document.addEventListener('keydown', onKeyDown);
         audio.addEventListener('emptied', () => document.removeEventListener('keydown', onKeyDown));
 
-        // Rewind button
-        const btnRewind = document.getElementById('btn-rewind');
-        if (btnRewind) btnRewind.addEventListener('click', () => { audio.currentTime = 0; navIdx = validIndices.length > 0 ? validIndices[0] : -1; });
-
-        // Sentence-start button
-        const btnSentence = document.getElementById('btn-sentence');
-        if (btnSentence) btnSentence.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (navIdx < 0) return;
-            // Find start of current sentence
-            let si = navIdx;
-            for (let i = navIdx - 1; i >= 0; i--) {
-                if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
-                si = i;
-            }
-            // If already at sentence start, go to previous sentence
-            if (si === navIdx && si > 0) {
-                si = si - 1;
-                for (let i = si - 1; i >= 0; i--) {
+        // Register audio bar actions for this sync instance
+        window._audioBarActions = {
+            rewind() { audio.currentTime = 0; navIdx = validIndices.length > 0 ? validIndices[0] : -1; },
+            sentenceStart() {
+                if (navIdx < 0) return;
+                let si = navIdx;
+                for (let i = navIdx - 1; i >= 0; i--) {
                     if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
                     si = i;
                 }
+                if (si === navIdx && si > 0) {
+                    si = si - 1;
+                    for (let i = si - 1; i >= 0; i--) {
+                        if (/[.!?]$/.test(chunks[i].source.trimEnd())) break;
+                        si = i;
+                    }
+                }
+                for (let i = si; i < chunks.length; i++) {
+                    if (chunks[i].audioStart !== null) { navIdx = i; audio.currentTime = chunks[i].audioStart; return; }
+                }
             }
-            // Find first valid timestamp at or after si
-            for (let i = si; i < chunks.length; i++) {
-                if (chunks[i].audioStart !== null) { navIdx = i; audio.currentTime = chunks[i].audioStart; return; }
-            }
-        });
+        };
     }
 
     // ================================================================
@@ -2378,8 +2388,9 @@
             const audioSrc = state.audioUrl || (state.audioBase64 ? 'data:audio/mpeg;base64,' + state.audioBase64 : null);
             const ac = $('questioner-audio-container');
             ac.innerHTML = audioSrc
-                ? `<audio id="questionerAudio" controls preload="auto" src="${audioSrc}"></audio><div class="audio-btns"><button id="qbtn-rewind" title="Rewind to start">⏮ Rewind</button><button id="qbtn-sentence" title="Back to sentence start">↩ Sentence start</button></div><div class="kbd-legend"><span><kbd>Space</kbd> / <kbd>↓</kbd> Play/Pause</span><span><kbd>←</kbd> Prev Chunk</span><span><kbd>→</kbd> Next Chunk</span><span><kbd>↑</kbd> Show Translation</span></div>`
+                ? `<audio id="questionerAudio" preload="auto" src="${audioSrc}"></audio>`
                 : '';
+            showAudioBar(audioSrc ? 'questionerAudio' : null);
             const qt = $('questioner-text');
             const useTiptap = state.tiptapData && state.tiptapData.html;
             if (useTiptap) { qt.innerHTML = buildTiptapWithChunks(); qt.className = 'reader-text tiptap-rich'; }
@@ -3006,13 +3017,9 @@
     // TOOLTIP
     // ================================================================
     const tooltipEl = $('tooltip');
-    let tooltipAutoHideTimer = null;
     function showTooltip(element, chunk) {
-        if (tooltipAutoHideTimer) { clearTimeout(tooltipAutoHideTimer); tooltipAutoHideTimer = null; }
         const aud = document.getElementById(activeAudioId);
-        let wasPlaying = false;
         if (aud) {
-            wasPlaying = !aud.paused;
             if (!aud.paused) aud.pause();
             if (chunk.audioStart !== null && chunk.audioStart !== undefined) {
                 navLock = true;
@@ -3030,16 +3037,8 @@
         let top = tr.top - ttr.height - 12; let left = tr.left + (tr.width / 2) - (ttr.width / 2); if (left < 16) left = 16; if (left + ttr.width > window.innerWidth - 16) left = window.innerWidth - ttr.width - 16; if (top < 80) top = tr.bottom + 12;
         tooltipEl.style.top = `${top}px`; tooltipEl.style.left = `${left}px`;
         if (!state.tappedIds.has(chunk.id)) { state.tapCount++; state.tappedIds.add(chunk.id); $('tapCount').textContent = state.tapCount; $('uniqueCount').textContent = state.tappedIds.size; saveState(); }
-        // Auto-dismiss after 2s if audio was playing, then resume
-        if (wasPlaying) {
-            tooltipAutoHideTimer = setTimeout(() => {
-                tooltipAutoHideTimer = null;
-                hideTooltip();
-                if (aud && aud.paused) aud.play();
-            }, 2000);
-        }
     }
-    function hideTooltip() { if (tooltipAutoHideTimer) { clearTimeout(tooltipAutoHideTimer); tooltipAutoHideTimer = null; } tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } tapResumeTime = null; }
+    function hideTooltip() { tooltipEl.classList.remove('visible'); if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; } tapResumeTime = null; }
     document.addEventListener('click', (e) => { if (tooltipEl.classList.contains('visible') && !e.target.closest('.chunk') && !e.target.closest('.tooltip')) hideTooltip(); });
     window.addEventListener('scroll', hideTooltip, { passive: true });
     window.addEventListener('resize', hideTooltip, { passive: true });
@@ -3400,10 +3399,73 @@ document.getElementById('editor').addEventListener('scroll',function(){if(rsWrap
     $('btn-load-results').addEventListener('click', loadResults);
 
     // ================================================================
+    // PINNED AUDIO BAR
+    // ================================================================
+    let audioBarAudioId = null;
+    let audioBarRAF = null;
+    function showAudioBar(audioId) {
+        const bar = $('audio-bar');
+        if (!audioId) { bar.classList.remove('visible'); audioBarAudioId = null; return; }
+        audioBarAudioId = audioId;
+        bar.classList.add('visible');
+        // Wait for the audio element to be in DOM
+        setTimeout(() => {
+            const aud = document.getElementById(audioBarAudioId);
+            if (!aud) return;
+            const updateBar = () => {
+                const fill = $('audio-bar-fill');
+                const timeEl = $('audio-bar-time');
+                const playBtn = $('audio-bar-play');
+                if (!aud || !fill) return;
+                const pct = aud.duration ? (aud.currentTime / aud.duration) * 100 : 0;
+                fill.style.width = pct + '%';
+                const fmt = (s) => { const m = Math.floor(s / 60); return m + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
+                timeEl.textContent = fmt(aud.currentTime) + ' / ' + (aud.duration ? fmt(aud.duration) : '0:00');
+                playBtn.textContent = aud.paused ? '▶' : '⏸';
+            };
+            aud.addEventListener('timeupdate', updateBar);
+            aud.addEventListener('play', updateBar);
+            aud.addEventListener('pause', updateBar);
+            aud.addEventListener('loadedmetadata', updateBar);
+            updateBar();
+        }, 0);
+    }
+    $('audio-bar-play').addEventListener('click', () => {
+        const aud = audioBarAudioId && document.getElementById(audioBarAudioId);
+        if (!aud) return;
+        if (aud.paused) { hideTooltip(); aud.play(); } else { aud.pause(); }
+    });
+    $('audio-bar-progress').addEventListener('click', (e) => {
+        const aud = audioBarAudioId && document.getElementById(audioBarAudioId);
+        if (!aud || !aud.duration) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pct = (e.clientX - rect.left) / rect.width;
+        aud.currentTime = pct * aud.duration;
+    });
+    $('audio-bar-rewind').addEventListener('click', () => {
+        if (window._audioBarActions) window._audioBarActions.rewind();
+    });
+    $('audio-bar-sentence').addEventListener('click', () => {
+        if (window._audioBarActions) window._audioBarActions.sentenceStart();
+    });
+
+    // ================================================================
     // INIT
     // ================================================================
     initEditorIframe();
     loadLectos();
     </script>
+    <!-- Pinned audio bar -->
+    <div class="audio-bar" id="audio-bar">
+        <button class="audio-bar-btn" id="audio-bar-play" title="Play / Pause">▶</button>
+        <div class="audio-bar-progress" id="audio-bar-progress">
+            <div class="audio-bar-fill" id="audio-bar-fill"></div>
+        </div>
+        <span class="audio-bar-time" id="audio-bar-time">0:00 / 0:00</span>
+        <div class="audio-bar-btns">
+            <button id="audio-bar-rewind" title="Rewind to start">⏮</button>
+            <button id="audio-bar-sentence" title="Back to sentence start">↩</button>
+        </div>
+    </div>
 </body>
 </html>
