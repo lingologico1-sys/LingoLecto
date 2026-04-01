@@ -783,6 +783,19 @@
 
     <div class="tooltip" id="tooltip"></div>
 
+    <!-- Pinned audio bar -->
+    <div class="audio-bar" id="audio-bar">
+        <button class="audio-bar-btn" id="audio-bar-play" title="Play / Pause">▶</button>
+        <div class="audio-bar-progress" id="audio-bar-progress">
+            <div class="audio-bar-fill" id="audio-bar-fill"></div>
+        </div>
+        <span class="audio-bar-time" id="audio-bar-time">0:00 / 0:00</span>
+        <div class="audio-bar-btns">
+            <button id="audio-bar-rewind" title="Rewind to start">⏮</button>
+            <button id="audio-bar-sentence" title="Back to sentence start">↩</button>
+        </div>
+    </div>
+
     <script>
     // ================================================================
     // STATE
@@ -3455,17 +3468,5 @@ document.getElementById('editor').addEventListener('scroll',function(){if(rsWrap
     initEditorIframe();
     loadLectos();
     </script>
-    <!-- Pinned audio bar -->
-    <div class="audio-bar" id="audio-bar">
-        <button class="audio-bar-btn" id="audio-bar-play" title="Play / Pause">▶</button>
-        <div class="audio-bar-progress" id="audio-bar-progress">
-            <div class="audio-bar-fill" id="audio-bar-fill"></div>
-        </div>
-        <span class="audio-bar-time" id="audio-bar-time">0:00 / 0:00</span>
-        <div class="audio-bar-btns">
-            <button id="audio-bar-rewind" title="Rewind to start">⏮</button>
-            <button id="audio-bar-sentence" title="Back to sentence start">↩</button>
-        </div>
-    </div>
 </body>
 </html>
