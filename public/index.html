@@ -2427,10 +2427,19 @@
         qrPrepared = qs.questions.map(q => {
             // q.options is an array; q.correct_index is the index of the correct answer
             const opts = (q.options || []).map((text, i) => ({ text, correct: i === q.correct_index }));
-            // Shuffle (Fisher-Yates), preserving correctness flag
-            for (let i = opts.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [opts[i], opts[j]] = [opts[j], opts[i]];
+            if (q.type === 'true_false') {
+                // Always show True/Vrai first, then False/Faux
+                opts.sort((a, b) => {
+                    const aTrue = /^(true|vrai)/i.test(a.text);
+                    const bTrue = /^(true|vrai)/i.test(b.text);
+                    return aTrue === bTrue ? 0 : aTrue ? -1 : 1;
+                });
+            } else {
+                // Shuffle (Fisher-Yates), preserving correctness flag
+                for (let i = opts.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [opts[i], opts[j]] = [opts[j], opts[i]];
+                }
             }
             return { q, options: opts, picked: null, answered: false };
         });
