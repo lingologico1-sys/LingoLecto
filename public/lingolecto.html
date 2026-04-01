@@ -87,8 +87,8 @@
         /* AUDIO + TEXT */
         .audio-container { margin-bottom: 28px; }
         .audio-container audio { display: none; }
-        /* Pinned audio bar */
-        .audio-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 900; display: none; align-items: center; gap: 12px; padding: 10px 20px; background: var(--paper); border-top: 1px solid var(--border); box-shadow: 0 -2px 12px rgba(0,0,0,0.12); }
+        /* Pinned audio bar — constrained to left (text) column on desktop */
+        .audio-bar { position: fixed; bottom: 0; left: 0; right: 360px; z-index: 900; display: none; align-items: center; gap: 12px; padding: 10px 20px; background: var(--paper); border-top: 1px solid var(--border); box-shadow: 0 -2px 12px rgba(0,0,0,0.12); }
         .audio-bar.visible { display: flex; }
         .audio-bar-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; color: var(--accent); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
         .audio-bar-btn:hover { background: var(--accent); color: #fff; }
@@ -240,6 +240,9 @@
             #view-lecto.active { overflow-y: auto; height: auto; }
             .questioner-right { height: 60vh; }
             .questioner-left { padding: 24px 20px 80px; }
+            /* On mobile audio bar goes full width, so push qr-footer above it */
+            .audio-bar { right: 0; }
+            .qr-footer { padding-bottom: calc(10px + 62px); }
         }
         @media (max-width: 600px) {
             .ll-header { padding: 0 16px; }
