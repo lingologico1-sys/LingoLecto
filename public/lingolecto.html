@@ -86,12 +86,18 @@
 
         /* AUDIO + TEXT */
         .audio-container { margin-bottom: 28px; }
-        .audio-container audio { width: 100%; height: 44px; border-radius: 8px; outline: none; }
-        .audio-btns { display: flex; gap: 8px; margin-top: 8px; }
-        .audio-btns button { flex: 1; padding: 6px 0; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; transition: background 0.15s; font-family: 'DM Sans', sans-serif; }
-        .audio-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
-        .kbd-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
-        .kbd-legend kbd { display: inline-block; padding: 1px 5px; font-size: 11px; font-family: inherit; background: var(--paper); border: 1px solid var(--border); border-radius: 3px; box-shadow: 0 1px 0 var(--border); }
+        .audio-container audio { display: none; }
+        /* Pinned audio bar */
+        .audio-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 900; display: none; align-items: center; gap: 12px; padding: 10px 20px; background: var(--paper); border-top: 1px solid var(--border); box-shadow: 0 -2px 12px rgba(0,0,0,0.12); }
+        .audio-bar.visible { display: flex; }
+        .audio-bar-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; color: var(--accent); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
+        .audio-bar-btn:hover { background: var(--accent); color: #fff; }
+        .audio-bar-progress { flex: 1; height: 6px; background: var(--border); border-radius: 3px; cursor: pointer; position: relative; overflow: hidden; }
+        .audio-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.1s linear; }
+        .audio-bar-time { font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; white-space: nowrap; flex-shrink: 0; }
+        .audio-bar-btns { display: flex; gap: 6px; flex-shrink: 0; }
+        .audio-bar-btns button { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--paper); color: var(--ink); cursor: pointer; transition: background 0.15s; font-family: 'DM Sans', sans-serif; }
+        .audio-bar-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
         .reader-text { font-family: 'Lora', Georgia, serif; font-size: 20px; line-height: 1.85; color: var(--ink); letter-spacing: 0.01em; }
         .reader-text p { margin-bottom: 24px; }
         .chunk { cursor: pointer; border-radius: 3px; transition: background 0.15s, color 0.15s; padding: 1px 2px; margin: 0 -2px; }
@@ -381,6 +387,19 @@
     </div>
 </div>
 
+<!-- Pinned audio bar -->
+<div class="audio-bar" id="audio-bar">
+    <button class="audio-bar-btn" id="audio-bar-play" title="Play / Pause">▶</button>
+    <div class="audio-bar-progress" id="audio-bar-progress">
+        <div class="audio-bar-fill" id="audio-bar-fill"></div>
+    </div>
+    <span class="audio-bar-time" id="audio-bar-time">0:00 / 0:00</span>
+    <div class="audio-bar-btns">
+        <button id="audio-bar-rewind" title="Rewind to start">⏮</button>
+        <button id="audio-bar-sentence" title="Back to sentence start">↩</button>
+    </div>
+</div>
+
 <script>
 // ================================================================
 // UTILITIES
@@ -641,20 +660,12 @@ function initLecto(lecto) {
     // Build audio player
     const ac = $('lecto-audio-container');
     if (audioSrc) {
-        ac.innerHTML = `<audio id="lectoAudio" controls preload="auto" src="${audioSrc}"></audio>
-            <div class="audio-btns">
-                <button id="btn-rewind">⏮ Rewind</button>
-                <button id="btn-sentence">↩ Sentence start</button>
-            </div>
-            <div class="kbd-legend">
-                <span><kbd>Space</kbd>/<kbd>↓</kbd> Play/Pause</span>
-                <span><kbd>←</kbd> Prev</span>
-                <span><kbd>→</kbd> Next</span>
-                <span><kbd>↑</kbd> Translate</span>
-            </div>`;
+        ac.innerHTML = `<audio id="lectoAudio" preload="auto" src="${audioSrc}"></audio>`;
         if (lecto.alignmentData) setupAudioSync('lectoAudio', 'lecto-text', $('lecto-left'), 'view-lecto');
+        showAudioBar();
     } else {
         ac.innerHTML = '';
+        hideAudioBar();
     }
 
     // Chunk click → tooltip
@@ -962,18 +973,17 @@ function setupAudioSync(audioId, textContainerId, scrollEl, panelId) {
     document.addEventListener('keydown', onKeyDown);
     audio.addEventListener('emptied', () => document.removeEventListener('keydown', onKeyDown));
 
-    const btnRewind = $('btn-rewind');
-    if (btnRewind) btnRewind.addEventListener('click', () => { audio.currentTime = 0; navIdx = validIndices.length > 0 ? validIndices[0] : -1; });
-
-    const btnSentence = $('btn-sentence');
-    if (btnSentence) btnSentence.addEventListener('click', e => {
-        e.stopPropagation();
-        if (navIdx < 0) return;
-        let si = navIdx;
-        for (let i = navIdx - 1; i >= 0; i--) { if (/[.!?]$/.test(chunks[i].source.trimEnd())) break; si = i; }
-        if (si === navIdx && si > 0) { si--; for (let i = si - 1; i >= 0; i--) { if (/[.!?]$/.test(chunks[i].source.trimEnd())) break; si = i; } }
-        for (let i = si; i < chunks.length; i++) { if (chunks[i].audioStart !== null) { navIdx = i; audio.currentTime = chunks[i].audioStart; return; } }
-    });
+    // Register audio bar actions for this sync instance
+    window._audioBarActions = {
+        rewind() { audio.currentTime = 0; navIdx = validIndices.length > 0 ? validIndices[0] : -1; },
+        sentenceStart() {
+            if (navIdx < 0) return;
+            let si = navIdx;
+            for (let i = navIdx - 1; i >= 0; i--) { if (/[.!?]$/.test(chunks[i].source.trimEnd())) break; si = i; }
+            if (si === navIdx && si > 0) { si--; for (let i = si - 1; i >= 0; i--) { if (/[.!?]$/.test(chunks[i].source.trimEnd())) break; si = i; } }
+            for (let i = si; i < chunks.length; i++) { if (chunks[i].audioStart !== null) { navIdx = i; audio.currentTime = chunks[i].audioStart; return; } }
+        }
+    };
 }
 
 // ================================================================
@@ -1562,14 +1572,10 @@ function renderDashVocab() {
 // TOOLTIP
 // ================================================================
 const tooltipEl = $('tooltip');
-let tooltipAutoHideTimer = null;
 
 function showTooltip(element, chunk) {
-    if (tooltipAutoHideTimer) { clearTimeout(tooltipAutoHideTimer); tooltipAutoHideTimer = null; }
     const aud = document.getElementById('lectoAudio');
-    let wasPlaying = false;
     if (aud) {
-        wasPlaying = !aud.paused;
         if (!aud.paused) aud.pause();
         if (chunk.audioStart !== null && chunk.audioStart !== undefined) {
             navLock = true;
@@ -1602,18 +1608,9 @@ function showTooltip(element, chunk) {
     if (top < 80) top = tr.bottom + 12;
     tooltipEl.style.top = `${top}px`;
     tooltipEl.style.left = `${left}px`;
-
-    if (wasPlaying) {
-        tooltipAutoHideTimer = setTimeout(() => {
-            tooltipAutoHideTimer = null;
-            hideTooltip();
-            if (aud && aud.paused) aud.play();
-        }, 2000);
-    }
 }
 
 function hideTooltip() {
-    if (tooltipAutoHideTimer) { clearTimeout(tooltipAutoHideTimer); tooltipAutoHideTimer = null; }
     tooltipEl.classList.remove('visible');
     if (activeChunkEl) { activeChunkEl.classList.remove('tapped'); activeChunkEl = null; }
     tapResumeTime = null;
@@ -1629,6 +1626,54 @@ window.addEventListener('resize', hideTooltip, { passive: true });
 // INITIAL RENDER
 // ================================================================
 renderQrQuestion(); // empty state
+
+// ================================================================
+// PINNED AUDIO BAR
+// ================================================================
+function showAudioBar() {
+    const bar = $('audio-bar');
+    bar.classList.add('visible');
+    setTimeout(() => {
+        const aud = document.getElementById('lectoAudio');
+        if (!aud) return;
+        const updateBar = () => {
+            const fill = $('audio-bar-fill');
+            const timeEl = $('audio-bar-time');
+            const playBtn = $('audio-bar-play');
+            if (!aud || !fill) return;
+            const pct = aud.duration ? (aud.currentTime / aud.duration) * 100 : 0;
+            fill.style.width = pct + '%';
+            const fmt = (s) => { const m = Math.floor(s / 60); return m + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
+            timeEl.textContent = fmt(aud.currentTime) + ' / ' + (aud.duration ? fmt(aud.duration) : '0:00');
+            playBtn.textContent = aud.paused ? '▶' : '⏸';
+        };
+        aud.addEventListener('timeupdate', updateBar);
+        aud.addEventListener('play', updateBar);
+        aud.addEventListener('pause', updateBar);
+        aud.addEventListener('loadedmetadata', updateBar);
+        updateBar();
+    }, 0);
+}
+function hideAudioBar() { $('audio-bar').classList.remove('visible'); }
+
+$('audio-bar-play').addEventListener('click', () => {
+    const aud = document.getElementById('lectoAudio');
+    if (!aud) return;
+    if (aud.paused) { hideTooltip(); aud.play(); } else { aud.pause(); }
+});
+$('audio-bar-progress').addEventListener('click', (e) => {
+    const aud = document.getElementById('lectoAudio');
+    if (!aud || !aud.duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    aud.currentTime = pct * aud.duration;
+});
+$('audio-bar-rewind').addEventListener('click', () => {
+    if (window._audioBarActions) window._audioBarActions.rewind();
+});
+$('audio-bar-sentence').addEventListener('click', () => {
+    if (window._audioBarActions) window._audioBarActions.sentenceStart();
+});
 </script>
 </body>
 </html>
