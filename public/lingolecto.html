@@ -100,7 +100,7 @@
         .audio-bar-btns button:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
         .audio-bar-hints { display: flex; align-items: center; gap: 14px; flex-shrink: 0; border-left: 1px solid var(--border); padding-left: 16px; }
         .audio-hint { display: inline-flex; align-items: center; gap: 5px; }
-        .audio-hint kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; font-size: 13px; font-family: inherit; background: var(--surface); border: 1px solid var(--border); border-bottom: 3px solid var(--border); border-radius: 5px; color: var(--ink); font-weight: 600; line-height: 1; }
+        .audio-hint kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; font-size: 13px; font-family: inherit; background: linear-gradient(to bottom, #ffffff 0%, #e8e2da 100%); border: 1px solid #c4bbb1; border-bottom: 3px solid #a89e94; border-radius: 5px; box-shadow: 0 2px 3px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.95); color: var(--ink); font-weight: 700; line-height: 1; }
         .audio-hint-label { font-size: 10px; color: var(--text-secondary); letter-spacing: 0.03em; }
         @media (max-width: 800px) { .audio-bar-hints { display: none; } }
         .reader-text { font-family: 'Lora', Georgia, serif; font-size: 20px; line-height: 1.85; color: var(--ink); letter-spacing: 0.01em; }
@@ -411,8 +411,8 @@
         <button id="audio-bar-sentence" title="Back to sentence start">↩</button>
     </div>
     <div class="audio-bar-hints">
-        <span class="audio-hint"><kbd>↑</kbd><span class="audio-hint-label">trad.</span></span>
         <span class="audio-hint"><kbd>↓</kbd><span class="audio-hint-label">▶⏸</span></span>
+        <span class="audio-hint"><kbd>↑</kbd><span class="audio-hint-label">trad.</span></span>
     </div>
 </div>
 
