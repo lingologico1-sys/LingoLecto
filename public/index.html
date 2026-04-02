@@ -436,7 +436,7 @@
                 <div class="progress-steps" id="progress-steps" style="display:none;">
                     <span class="progress-step" id="step-chunk">1 Chunking</span>
                     <span class="progress-arrow">→</span>
-                    <span class="progress-step" id="step-audio">2 Audio</span>
+                    <span class="progress-step" id="step-audio">2 Audio + Questions</span>
                     <span class="progress-arrow">→</span>
                     <span class="progress-step" id="step-done">3 Done</span>
                 </div>
@@ -756,7 +756,7 @@
                             <textarea id="q-source-text" class="data-textarea" style="height:160px;" spellcheck="false" placeholder="Source text will be pre-filled from the lecto..."></textarea>
                         </div>
                     </div>
-                    <button class="btn btn-primary" id="btn-generate-questions" style="margin-top:12px;">&#9889; Generate 30 Questions</button>
+                    <button class="btn btn-secondary" id="btn-generate-questions" style="margin-top:12px;">&#9889; Regenerate Questions</button>
                     <div class="status-msg" id="q-gen-status" style="margin-top:8px;"></div>
                 </div>
 
@@ -1245,21 +1245,57 @@
                 sourceText = readerData.chunks.map(c => c.source).join('');
             }
 
-            setStatus('Generating audio with ElevenLabs…', 'loading');
+            setStatus('Generating audio & questions in parallel…', 'loading');
             setProgress('audio');
             startPipelineTimer('audio');
+
+            // Start questions job in background (non-blocking)
+            const examTitle = $('data-title') ? $('data-title').value.trim() : '';
+            const questionsPromise = authedFetch('/api/questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ examTitle, sourceText })
+            }).then(async r => {
+                if (!r.ok) throw new Error('Questions start failed');
+                const { jobId } = await r.json();
+                return new Promise((resolve, reject) => {
+                    const poll = async () => {
+                        try {
+                            const pr = await fetch('/api/questions/' + jobId);
+                            if (!pr.ok) { reject(new Error('Questions poll failed')); return; }
+                            const d = await pr.json();
+                            if (d.status === 'processing') { setTimeout(poll, 2000); return; }
+                            if (d.status === 'error') { reject(new Error(d.error || 'Questions failed')); return; }
+                            resolve(d.result);
+                        } catch (e) { reject(e); }
+                    };
+                    poll();
+                });
+            }).catch(e => { console.warn('Background questions failed:', e.message); return null; });
+
+            // Audio (critical path)
             const audioRes = await authedFetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voiceId, text: sourceText, stability: parseFloat(stabilityEl.value), similarity_boost: parseFloat(similarityEl.value), style: parseFloat(styleEl.value), use_speaker_boost: $('use_speaker_boost').checked }) });
             if (!audioRes.ok) { const err = await audioRes.json().catch(() => ({ error: `HTTP ${audioRes.status}` })); throw new Error(err.error || `ElevenLabs failed: ${audioRes.status}`); }
             const audioData = await audioRes.json();
             stopPipelineTimer();
-            const charCount = sourceText.length;
-            setStatus(`Audio done — ${charCount.toLocaleString()} characters sent to ElevenLabs`, 'success');
 
             setProgress('done');
             resetPipelineUI();
             state.readerData = readerData; state.alignmentData = audioData.alignment || null; state.tiptapData = tiptapData; state.audioBase64 = audioData.audio_base64 || null; state.audioUrl = null; state.tappedIds = new Set(); state.tapCount = 0;
             saveState();
             showReaderView();
+            setStatus(`Audio done — ${sourceText.length.toLocaleString()} characters · questions generating…`, 'success');
+
+            // When questions finish, silently populate the Questions tab
+            questionsPromise.then(result => {
+                if (!result) { setQGenStatus('⚠ Questions could not be generated.', 'error'); return; }
+                renderQuestionsPanel(result);
+                setQGenStatus(`✓ ${result.questions.length} questions ready — review and click "Add Questions to this Lecto".`, 'success');
+                // Switch to Questions tab to draw attention
+                const qTab = document.querySelector('[data-rtab="questions"]');
+                if (qTab) qTab.style.outline = '2px solid var(--accent)';
+                setTimeout(() => { if (qTab) qTab.style.outline = ''; }, 4000);
+            });
         } catch (err) { console.error('Pipeline error:', err); resetPipelineUI(); setStatus(err.message || 'Something went wrong.', 'error'); }
         finally { $('btn-generate').disabled = false; }
     });
