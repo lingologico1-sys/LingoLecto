@@ -269,7 +269,7 @@ app.post('/api/questions', requireAuth, (req, res) => {
                     text: { verbosity: 'low' },
                     prompt: {
                         id: 'pmpt_6993dce769d081958795777ea62764120520f929bc8ef915',
-                        version: '11',
+                        version: '12',
                         variables: { exam_title: examTitle || '', source_text: sourceText }
                     }
                 })
@@ -360,11 +360,10 @@ app.post('/api/publish', requireAuth, async (req, res) => {
                 for (let i = 0; i < 6; i++) token += chars[Math.floor(Math.random() * chars.length)];
                 // Check if token already exists in R2
                 try {
-                    await s3.send(new GetObjectCommand({ Bucket: LECTO_BUCKET, Key: `json/${token}.json` }));
-                    // Object exists, try another token
-                    continue;
+                    const listCheck = await s3.send(new ListObjectsV2Command({ Bucket: LECTO_BUCKET, Prefix: `json/${token}_`, MaxKeys: 1 }));
+                    if (!listCheck.Contents || listCheck.Contents.length === 0) return token;
+                    // Token prefix already in use, try another
                 } catch (e) {
-                    if (e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) return token;
                     throw e;
                 }
             }
@@ -374,7 +373,7 @@ app.post('/api/publish', requireAuth, async (req, res) => {
 
         // 1. Upload audio
         const audioBuf = Buffer.from(audioBase64, 'base64');
-        const audioKey = `aud/${slug}.mp3`;
+        const audioKey = `aud/${token}_${slug}.mp3`;
         await s3.send(new PutObjectCommand({
             Bucket: LECTO_BUCKET,
             Key: audioKey,
@@ -415,7 +414,7 @@ app.post('/api/publish', requireAuth, async (req, res) => {
         // 3. Build consolidated JSON
         const consolidated = {
             title,
-            slug,
+            slug: `${token}_${slug}`,
             token,
             source_language: readerData.source_language,
             chunks: readerData.chunks,
@@ -426,7 +425,7 @@ app.post('/api/publish', requireAuth, async (req, res) => {
         };
 
         // 4. Upload JSON
-        const jsonKey = `json/${slug}.json`;
+        const jsonKey = `json/${token}_${slug}.json`;
         await s3.send(new PutObjectCommand({
             Bucket: LECTO_BUCKET,
             Key: jsonKey,

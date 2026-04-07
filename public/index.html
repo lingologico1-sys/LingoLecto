@@ -1983,7 +1983,16 @@
         const typeLabels = { text_type: 'Text Type', audience: 'Audience', main_idea: 'Main Idea', true_false: 'True/False', comprehension_mcq: 'Comprehension', text_based_answer: 'Text-Based', reference: 'Reference', synonym: 'Synonym', antonym: 'Antonym' };
         const letters = ['A','B','C','D','E'];
         const correctOpt = q.options[q.correct_index];
-        const displayOptions = [correctOpt, ...q.options.filter((_, i) => i !== q.correct_index)];
+        let displayOptions;
+        if (q.type === 'true_false') {
+            displayOptions = [...q.options].sort((a, b) => {
+                const aTrue = /^(true|vrai)/i.test(a);
+                const bTrue = /^(true|vrai)/i.test(b);
+                return aTrue === bTrue ? 0 : aTrue ? -1 : 1;
+            });
+        } else {
+            displayOptions = [correctOpt, ...q.options.filter((_, i) => i !== q.correct_index)];
+        }
 
         let sourceSentenceHtml = '';
         if (q.source_sentence) {
@@ -2006,7 +2015,7 @@
         }
         let optionsHtml = '<ul class="q-options">';
         displayOptions.forEach((opt, i) => {
-            optionsHtml += '<li class="' + (i === 0 ? 'q-correct' : '') + '"><span class="q-opt-marker">' + letters[i] + '</span>' + escapeHtml(opt) + '</li>';
+            optionsHtml += '<li class="' + (opt === correctOpt ? 'q-correct' : '') + '"><span class="q-opt-marker">' + letters[i] + '</span>' + escapeHtml(opt) + '</li>';
         });
         optionsHtml += '</ul>';
 
