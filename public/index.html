@@ -1924,7 +1924,7 @@
                 const poll = async () => {
                     try {
                         const pollRes = await fetch('/api/questions/' + jobId);
-                        if (!pollRes.ok) { reject(new Error(`Poll failed: ${pollRes.status}`)); return; }
+                        if (!pollRes.ok) { let em = `Poll failed: ${pollRes.status}`; try { const ed = await pollRes.json(); em = ed.error || em; } catch(_) {} reject(new Error(em)); return; }
                         const data = await pollRes.json();
                         if (data.status === 'processing') { setTimeout(poll, 2000); return; }
                         if (data.status === 'error') { reject(new Error(data.error || 'Generation failed')); return; }
