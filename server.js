@@ -247,9 +247,15 @@ app.get('/api/chunk/:jobId', (req, res) => {
 const questionJobs = new Map();
 
 app.post('/api/questions', requireAuth, (req, res) => {
-    const { examTitle, sourceText } = req.body;
+    const { examTitle, sourceText, model } = req.body;
     if (!sourceText || !sourceText.trim()) return res.status(400).json({ error: 'sourceText is required' });
     if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not set' });
+
+    const QUESTION_PROMPTS = {
+        standard: 'pmpt_6993dce769d081958795777ea62764120520f929bc8ef915',
+        mini:     'pmpt_69e0f047d9988196ba4bfe25800d2c8a02d308ea1bf0177a'
+    };
+    const promptId = QUESTION_PROMPTS[model] || QUESTION_PROMPTS.standard;
 
     const jobId = 'qjob_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     questionJobs.set(jobId, { status: 'processing', startedAt: Date.now() });
@@ -265,7 +271,7 @@ app.post('/api/questions', requireAuth, (req, res) => {
                     reasoning: { effort: 'high' },
                     text: { verbosity: 'low' },
                     prompt: {
-                        id: 'pmpt_6993dce769d081958795777ea62764120520f929bc8ef915',
+                        id: promptId,
                         variables: { exam_title: examTitle || '', source_text: sourceText }
                     }
                 })

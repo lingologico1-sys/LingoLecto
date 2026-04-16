@@ -755,6 +755,15 @@
                             <div class="field-label"><span>Source Text</span></div>
                             <textarea id="q-source-text" class="data-textarea" style="height:160px;" spellcheck="false" placeholder="Source text will be pre-filled from the lecto..."></textarea>
                         </div>
+                        <div class="field" style="margin-top:4px;">
+                            <div class="field-label"><span>Model</span></div>
+                            <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;margin-right:14px;">
+                                <input type="radio" name="q-model" value="standard" checked /> Standard
+                            </label>
+                            <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;">
+                                <input type="radio" name="q-model" value="mini" /> Mini
+                            </label>
+                        </div>
                     </div>
                     <button class="btn btn-secondary" id="btn-generate-questions" style="margin-top:12px;">&#9889; Regenerate Questions</button>
                     <div class="status-msg" id="q-gen-status" style="margin-top:8px;"></div>
@@ -1260,10 +1269,11 @@
 
             // Start questions job in background (non-blocking)
             const examTitle = $('data-title') ? $('data-title').value.trim() : '';
+            const qModel = document.querySelector('input[name="q-model"]:checked').value;
             const questionsPromise = authedFetch('/api/questions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ examTitle, sourceText })
+                body: JSON.stringify({ examTitle, sourceText, model: qModel })
             }).then(async r => {
                 if (!r.ok) throw new Error('Questions start failed');
                 const { jobId } = await r.json();
@@ -1921,6 +1931,7 @@
     $('btn-generate-questions').addEventListener('click', async () => {
         const examTitle = $('q-exam-title').value.trim();
         const sourceText = $('q-source-text').value.trim();
+        const qModel = document.querySelector('input[name="q-model"]:checked').value;
         if (!sourceText) { setQGenStatus('Source text is required.', 'error'); return; }
         setQGenStatus('Generating questions — this may take 1–2 minutes…', 'loading');
         $('btn-generate-questions').disabled = true;
@@ -1928,7 +1939,7 @@
             const startRes = await authedFetch('/api/questions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ examTitle, sourceText })
+                body: JSON.stringify({ examTitle, sourceText, model: qModel })
             });
             if (!startRes.ok) { const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` })); throw new Error(err.error || 'Failed to start'); }
             const { jobId } = await startRes.json();
