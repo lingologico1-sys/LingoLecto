@@ -767,6 +767,10 @@
                     </div>
                     <button class="btn btn-secondary" id="btn-generate-questions" style="margin-top:12px;">&#9889; Regenerate Questions</button>
                     <div class="status-msg" id="q-gen-status" style="margin-top:8px;"></div>
+                    <div class="progress-bar-wrap" id="q-progress-bar-wrap" style="display:none; margin-top:6px;">
+                        <div class="progress-bar-fill" id="q-progress-bar-fill"></div>
+                    </div>
+                    <div class="progress-timer" id="q-progress-timer" style="display:none;"></div>
                 </div>
 
                 <div id="q-questions-area" style="display:none; margin-top:24px; border-top:1px solid var(--border); padding-top:20px;">
@@ -1185,6 +1189,44 @@
         $('progress-bar-wrap').style.display = 'none';
         $('progress-timer').style.display = 'none';
         $('progress-bar-fill').style.width = '0%';
+    }
+
+    // Questions panel progress bar (independent of the main pipeline timer)
+    let qTimerRAF = null;
+    let qTimerStart = 0;
+
+    function startQTimer() {
+        qTimerStart = Date.now();
+        const avgMs = getAverageMs('questions');
+        $('q-progress-bar-wrap').style.display = 'block';
+        $('q-progress-timer').style.display = 'block';
+        $('q-progress-bar-fill').style.width = '0%';
+        function tick() {
+            const elapsed = Date.now() - qTimerStart;
+            let timerText = formatTime(elapsed);
+            if (avgMs > 0) {
+                const pct = Math.min((elapsed / avgMs) * 100, 95);
+                $('q-progress-bar-fill').style.width = pct + '%';
+                timerText += ` / ~${formatTime(avgMs)} avg`;
+            } else {
+                const pct = Math.min((elapsed / 120000) * 50, 50);
+                $('q-progress-bar-fill').style.width = pct + '%';
+            }
+            $('q-progress-timer').textContent = timerText;
+            qTimerRAF = requestAnimationFrame(tick);
+        }
+        qTimerRAF = requestAnimationFrame(tick);
+    }
+
+    function stopQTimer() {
+        if (qTimerRAF) { cancelAnimationFrame(qTimerRAF); qTimerRAF = null; }
+        const elapsed = Date.now() - qTimerStart;
+        if (elapsed > 5000) saveTimingEntry('questions', elapsed);
+        $('q-progress-bar-fill').style.width = '100%';
+        setTimeout(() => {
+            $('q-progress-bar-wrap').style.display = 'none';
+            $('q-progress-timer').style.display = 'none';
+        }, 800);
     }
 
     function extractTextFromHtml(html) {
@@ -1933,8 +1975,9 @@
         const sourceText = $('q-source-text').value.trim();
         const qModel = document.querySelector('input[name="q-model"]:checked').value;
         if (!sourceText) { setQGenStatus('Source text is required.', 'error'); return; }
-        setQGenStatus('Generating questions — this may take 1–2 minutes…', 'loading');
+        setQGenStatus('Generating questions…', 'loading');
         $('btn-generate-questions').disabled = true;
+        startQTimer();
         try {
             const startRes = await authedFetch('/api/questions', {
                 method: 'POST',
@@ -1956,9 +1999,11 @@
                 };
                 poll();
             });
+            stopQTimer();
             setQGenStatus('✓ Generated ' + result.questions.length + ' questions.', 'success');
             renderQuestionsPanel(result);
         } catch (err) {
+            stopQTimer();
             setQGenStatus('Error: ' + err.message, 'error');
         } finally {
             $('btn-generate-questions').disabled = false;
