@@ -210,7 +210,8 @@ app.post('/api/chunk', requireAuth, (req, res) => {
             }
 
             const usage = data.usage || null;
-            chunkJobs.set(jobId, { status: 'done', result: readerJson, usage });
+            const model = data.model || null;
+            chunkJobs.set(jobId, { status: 'done', result: readerJson, usage, model });
         } catch (err) {
             console.error('Chunk error:', err);
             const cause = err.cause ? ` (${err.cause.code || err.cause.message || ''})` : '';
@@ -239,8 +240,9 @@ app.get('/api/chunk/:jobId', (req, res) => {
     // done
     const result = job.result;
     const usage = job.usage || null;
+    const model = job.model || null;
     chunkJobs.delete(req.params.jobId);
-    res.json({ status: 'done', result, usage });
+    res.json({ status: 'done', result, usage, model });
 });
 
 // ── OpenAI: generate IB questions (async polling) ────────────────────────
@@ -298,7 +300,9 @@ app.post('/api/questions', requireAuth, (req, res) => {
             let parsed;
             try { parsed = JSON.parse(cleaned); } catch (e) { questionJobs.set(jobId, { status: 'error', error: 'Invalid JSON from OpenAI: ' + e.message }); return; }
             if (!parsed.questions || !Array.isArray(parsed.questions)) { questionJobs.set(jobId, { status: 'error', error: 'Response missing questions array' }); return; }
-            questionJobs.set(jobId, { status: 'done', result: parsed });
+            const usage = data.usage || null;
+            const model = data.model || null;
+            questionJobs.set(jobId, { status: 'done', result: parsed, usage, model });
         } catch (err) {
             console.error('Questions error:', err);
             questionJobs.set(jobId, { status: 'error', error: err.message || 'Internal server error' });
@@ -315,8 +319,10 @@ app.get('/api/questions/:jobId', (req, res) => {
     if (job.status === 'processing') return res.json({ status: 'processing', elapsed: Date.now() - job.startedAt });
     if (job.status === 'error') { questionJobs.delete(req.params.jobId); return res.status(500).json({ status: 'error', error: job.error }); }
     const result = job.result;
+    const usage = job.usage || null;
+    const model = job.model || null;
     questionJobs.delete(req.params.jobId);
-    res.json({ status: 'done', result });
+    res.json({ status: 'done', result, usage, model });
 });
 
 // ── Patch questions into existing lecto JSON ─────────────────────────────

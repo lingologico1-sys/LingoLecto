@@ -96,6 +96,12 @@
         .progress-bar-wrap { width: 100%; height: 6px; background: var(--border-light); border-radius: 3px; margin-top: 8px; overflow: hidden; }
         .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.3s ease; }
         .progress-timer { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .token-log { margin-top: 10px; font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+        .token-log-entry { padding: 3px 0; border-bottom: 1px solid var(--border-light); display: flex; gap: 8px; flex-wrap: wrap; }
+        .token-log-entry:last-child { border-bottom: none; }
+        .token-log-label { font-weight: 700; color: var(--ink); min-width: 80px; }
+        .token-log-model { color: var(--accent); }
+        .token-log-tokens { font-variant-numeric: tabular-nums; }
 
         /* TipTap Editor Embed */
         .tiptap-editor-frame { width: 100%; height: 500px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -446,6 +452,7 @@
                 <div class="progress-timer" id="progress-timer" style="display:none;"></div>
                 <span id="status-text"></span>
             </div>
+            <div class="token-log" id="gen-token-log" style="display:none;"></div>
         </div>
     </div>
 
@@ -771,6 +778,7 @@
                         <div class="progress-bar-fill" id="q-progress-bar-fill"></div>
                     </div>
                     <div class="progress-timer" id="q-progress-timer" style="display:none;"></div>
+                    <div class="token-log" id="q-token-log" style="display:none;"></div>
                 </div>
 
                 <div id="q-questions-area" style="display:none; margin-top:24px; border-top:1px solid var(--border); padding-top:20px;">
@@ -1191,6 +1199,20 @@
         $('progress-bar-fill').style.width = '0%';
     }
 
+    function appendTokenEntry(containerId, label, model, usage) {
+        const container = $(containerId);
+        if (!container) return;
+        container.style.display = 'block';
+        const u = usage || {};
+        const inTok = (u.input_tokens ?? u.prompt_tokens ?? '?').toLocaleString();
+        const outTok = (u.output_tokens ?? u.completion_tokens ?? '?').toLocaleString();
+        const total = (u.total_tokens ?? ((u.input_tokens ?? 0) + (u.output_tokens ?? 0)) || '?').toLocaleString();
+        const entry = document.createElement('div');
+        entry.className = 'token-log-entry';
+        entry.innerHTML = `<span class="token-log-label">${label}</span><span class="token-log-model">${model || 'unknown model'}</span><span class="token-log-tokens">${inTok} in · ${outTok} out · ${total} total</span>`;
+        container.appendChild(entry);
+    }
+
     // Questions panel progress bar (independent of the main pipeline timer)
     let qTimerRAF = null;
     let qTimerStart = 0;
@@ -1289,10 +1311,8 @@
                             const data = await pollRes.json();
                             if (data.status === 'processing') { setTimeout(poll, 2000); return; }
                             if (data.status === 'error') { reject(new Error(data.error || 'Chunking failed')); return; }
-                            if (data.usage) {
-                                const u = data.usage;
-                                console.log('OpenAI usage:', u);
-                                setStatus(`Chunking done — ${u.input_tokens?.toLocaleString() || '?'} input / ${u.output_tokens?.toLocaleString() || '?'} output tokens`, 'success');
+                            if (data.usage || data.model) {
+                                appendTokenEntry('gen-token-log', 'Chunking', data.model, data.usage);
                             }
                             resolve(data.result);
                         } catch (e) { reject(new Error('Chunk poll error: ' + (e.message || e))); }
@@ -1986,7 +2006,7 @@
             });
             if (!startRes.ok) { const err = await startRes.json().catch(() => ({ error: `HTTP ${startRes.status}` })); throw new Error(err.error || 'Failed to start'); }
             const { jobId } = await startRes.json();
-            const result = await new Promise((resolve, reject) => {
+            const qResponse = await new Promise((resolve, reject) => {
                 const poll = async () => {
                     try {
                         const pollRes = await fetch('/api/questions/' + jobId);
@@ -1994,12 +2014,16 @@
                         const data = await pollRes.json();
                         if (data.status === 'processing') { setTimeout(poll, 2000); return; }
                         if (data.status === 'error') { reject(new Error(data.error || 'Generation failed')); return; }
-                        resolve(data.result);
+                        resolve(data);
                     } catch (e) { reject(e); }
                 };
                 poll();
             });
             stopQTimer();
+            if (qResponse.usage || qResponse.model) {
+                appendTokenEntry('q-token-log', 'Questions', qResponse.model, qResponse.usage);
+            }
+            const result = qResponse.result;
             setQGenStatus('✓ Generated ' + result.questions.length + ' questions.', 'success');
             renderQuestionsPanel(result);
         } catch (err) {
