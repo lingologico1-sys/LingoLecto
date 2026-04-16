@@ -1050,6 +1050,7 @@
     // Restore saved form state on load
     loadFormState();
     if (getAuthToken()) $('auth-password').value = getAuthToken();
+    $('auth-password').addEventListener('input', () => setAuthToken($('auth-password').value.trim()));
 
     if (localStorage.getItem(STORAGE_KEY)) $('btn-restore').style.display = '';
 
@@ -1416,6 +1417,7 @@
 
         // Pre-fill password
         if (getAuthToken()) $('editor-password').value = getAuthToken();
+        $('editor-password').addEventListener('input', () => setAuthToken($('editor-password').value.trim()));
 
         // Sync voice settings from hidden store
         $('editor-voiceId').value = $('voiceId').value;
