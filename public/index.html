@@ -834,7 +834,13 @@
     // AUTH
     // ================================================================
     function getAuthToken() { return localStorage.getItem('lecto_auth') || ''; }
-    function setAuthToken(t) { localStorage.setItem('lecto_auth', t); }
+    function setAuthToken(t) {
+        localStorage.setItem('lecto_auth', t);
+        ['tiptapEditorFrame', 'readerEditorFrame'].forEach(id => {
+            const f = $(id);
+            if (f && f.contentWindow) f.contentWindow.postMessage({ type: 'set-auth-token', token: t }, '*');
+        });
+    }
     function authHeaders(extra) { return Object.assign({ 'x-auth-token': getAuthToken() }, extra || {}); }
     function authedFetch(url, opts) {
         opts = opts || {};
@@ -886,6 +892,8 @@
             }
             if (data.type === 'ready') {
                 restoreEditorContent();
+                const tok = getAuthToken();
+                if (tok) iframe.contentWindow.postMessage({ type: 'set-auth-token', token: tok }, '*');
             }
         });
     }
@@ -1398,6 +1406,8 @@
                     readerEditorHtml = e.data.detail.html;
                 } else if (e.data.type === 'ready') {
                     loadLectoIntoReaderEditor();
+                    const tok = getAuthToken();
+                    if (tok) iframe.contentWindow.postMessage({ type: 'set-auth-token', token: tok }, '*');
                 }
             });
         } else {
@@ -3258,6 +3268,7 @@ const COLORS=[{n:'Black',v:'#000000'},{n:'Grey',v:'#555555'},{n:'Red',v:'#d32f2f
 const SIZES=[10,12,14,16,18,20,24,28,32,40,48,64];
 const pendingUploads={};
 let editor;
+let _authToken = '';
 
 function send(type,detail){window.parent.postMessage({type,detail},'*')}
 
@@ -3272,7 +3283,7 @@ pendingUploads[id]=true;
 if(preview){const attrs={src:preview,'data-upload-id':id};try{const{state:s}=editor;const n=s.schema.nodes.image.create(attrs);editor.view.dispatch(s.tr.insert(pos,n))}catch(e){editor.chain().focus().setImage(attrs).run()}
 createOverlay(id)}
 try{
-const res=await fetch('${location.origin}/api/upload-image',{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':file.name,'x-auth-token':'${getAuthToken()}'},body:file});
+const res=await fetch('${location.origin}/api/upload-image',{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':file.name,'x-auth-token':_authToken},body:file});
 const data=await res.json();
 delete pendingUploads[id];removeOverlay(id);
 if(data.ok)replacePlaceholder(id,data.publicUrl);else{removePlaceholder(id);alert('Upload failed: '+(data.error||'Unknown'));}
@@ -3353,7 +3364,7 @@ else if(cmd==='tblDelete')delTable()}}
 try{
 buildFontMenu();buildColors();buildEmoji();
 editor=new Editor({element:document.getElementById('editor'),extensions:[StarterKit,Underline,TextStyle,Color,Highlight.configure({multicolor:true}),FontFamily,FontSize,TextAlign.configure({types:['heading','paragraph']}),Link.configure({openOnClick:false}),ResizableImage.configure({inline:true,allowBase64:true}),Table.configure({resizable:true}),TableRow,TableHeader,TableCell,CharacterCount],onUpdate:()=>{const j=editor.getJSON();send('content-changed',{json:j,jsonString:JSON.stringify(j),html:editor.getHTML()});updateToolbar()},onSelectionUpdate:updateToolbar,onCreate:()=>{editor.chain().focus().setFontFamily('Comic Sans MS').run();updateToolbar();send('ready',{ok:true})}});
-window.addEventListener('message',function(ev){try{var d=ev.data||{};if(d.type==='set-content'&&editor){if(d.json){editor.commands.setContent(d.json,true)}else if(d.html){editor.commands.setContent(d.html,true)}}}catch(e){console.error('set-content failed',e)}});
+window.addEventListener('message',function(ev){try{var d=ev.data||{};if(d.type==='set-auth-token'){_authToken=d.token||''}else if(d.type==='set-content'&&editor){if(d.json){editor.commands.setContent(d.json,true)}else if(d.html){editor.commands.setContent(d.html,true)}}}catch(e){console.error('set-content failed',e)}});
 wire();
 
 /* ── Image Resize System ── */
