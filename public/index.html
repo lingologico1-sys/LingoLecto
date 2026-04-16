@@ -1206,7 +1206,7 @@
         const u = usage || {};
         const inTok = (u.input_tokens ?? u.prompt_tokens ?? '?').toLocaleString();
         const outTok = (u.output_tokens ?? u.completion_tokens ?? '?').toLocaleString();
-        const total = (u.total_tokens ?? ((u.input_tokens ?? 0) + (u.output_tokens ?? 0)) || '?').toLocaleString();
+        const total = (u.total_tokens != null ? u.total_tokens : (u.input_tokens ?? 0) + (u.output_tokens ?? 0)).toLocaleString();
         const entry = document.createElement('div');
         entry.className = 'token-log-entry';
         entry.innerHTML = `<span class="token-log-label">${label}</span><span class="token-log-model">${model || 'unknown model'}</span><span class="token-log-tokens">${inTok} in · ${outTok} out · ${total} total</span>`;
