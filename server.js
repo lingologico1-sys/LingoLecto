@@ -163,10 +163,8 @@ app.post('/api/chunk', requireAuth, (req, res) => {
                 signal: AbortSignal.timeout(600000),
                 dispatcher: longTimeoutAgent,
                 body: JSON.stringify({
-                    model: 'gpt-5.4',
                     prompt: {
                         id: 'pmpt_69b2d7a72cb881969e6ae694840f10bb00fedaf3be2cf1ea',
-                        version: '11',
                         variables: { source_text: sourceText }
                     }
                 })
@@ -264,12 +262,10 @@ app.post('/api/questions', requireAuth, (req, res) => {
                 signal: AbortSignal.timeout(600000),
                 dispatcher: longTimeoutAgent,
                 body: JSON.stringify({
-                    model: 'gpt-5.2',
                     reasoning: { effort: 'high' },
                     text: { verbosity: 'low' },
                     prompt: {
                         id: 'pmpt_6993dce769d081958795777ea62764120520f929bc8ef915',
-                        version: '12',
                         variables: { exam_title: examTitle || '', source_text: sourceText }
                     }
                 })
