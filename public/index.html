@@ -435,6 +435,15 @@
                 <label class="field-label" for="auth-password">Password</label>
                 <input type="password" id="auth-password" placeholder="Enter password to generate" style="width:200px;">
             </div>
+            <div class="field-group" style="margin-bottom:12px;">
+                <label class="field-label">Question Model</label>
+                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;margin-right:14px;">
+                    <input type="radio" name="q-model" value="standard" checked /> Standard
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;">
+                    <input type="radio" name="q-model" value="mini" /> Mini
+                </label>
+            </div>
             <button class="btn btn-primary" id="btn-generate">Generate & Open Reader</button>
             <button class="btn btn-secondary" id="btn-restore" style="display:none;">Restore Previous Session</button>
 
@@ -765,7 +774,7 @@
                         <div class="field" style="margin-top:4px;">
                             <div class="field-label"><span>Model</span></div>
                             <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;margin-right:14px;">
-                                <input type="radio" name="q-model" value="standard" checked /> Standard
+                                <input type="radio" name="q-model" value="standard" /> Standard
                             </label>
                             <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;">
                                 <input type="radio" name="q-model" value="mini" /> Mini
@@ -1831,7 +1840,7 @@
         const title = $('data-title').value.trim();
         if (!title) { alert('Please enter a title'); $('data-title').focus(); return; }
         if (!state.readerData) { alert('No reader data available'); return; }
-        if (!state.audioBase64) { alert('No audio available to publish'); return; }
+        if (!state.audioBase64 && !state.audioUrl) { alert('No audio available to publish'); return; }
 
         const btn = $('btn-publish');
         const status = $('publish-status');
@@ -1840,6 +1849,18 @@
         $('publish-result').style.display = 'none';
 
         try {
+            let audioBase64 = state.audioBase64;
+            if (!audioBase64 && state.audioUrl) {
+                status.textContent = 'Fetching audio…';
+                const audioRes = await fetch(state.audioUrl);
+                if (!audioRes.ok) throw new Error('Failed to fetch audio for publish');
+                const buf = await audioRes.arrayBuffer();
+                const bytes = new Uint8Array(buf);
+                let binary = '';
+                for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                audioBase64 = btoa(binary);
+            }
+
             const res = await authedFetch('/api/publish', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1848,7 +1869,7 @@
                     readerData: state.readerData,
                     tiptapData: state.tiptapData,
                     alignmentData: state.alignmentData,
-                    audioBase64: state.audioBase64,
+                    audioBase64,
                     questionsData: state.questionsData || null
                 })
             });
